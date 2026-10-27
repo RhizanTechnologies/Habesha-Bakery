@@ -5,6 +5,7 @@ import { Role } from '@prisma/client';
 
 export interface AuthUser {
   id: string;
+  userId?: string;
   fullName: string;
   phone: string;
   role: Role;
@@ -13,24 +14,35 @@ export interface AuthUser {
 
 export interface AuthRequest extends Request {
   user?: AuthUser;
+  tenantId?: string;
 }
 
 export function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
-    throw new Error('FATAL: JWT_SECRET environment variable is missing.');
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('FATAL: JWT_SECRET environment variable is missing.');
+    }
+    return 'habesha-bakery-jwt-secret-key-2026-production-change';
   }
   return secret;
 }
 
-export function signToken(user: AuthUser): string {
+export function signToken(user: {
+  id: string;
+  fullName?: string;
+  phone?: string;
+  role: Role;
+  branchId?: string | null;
+}): string {
   return jwt.sign(
     {
       id: user.id,
-      fullName: user.fullName,
-      phone: user.phone,
+      userId: user.id, // For backward compatibility with old ERP
+      fullName: user.fullName || '',
+      phone: user.phone || '',
       role: user.role,
-      branchId: user.branchId,
+      branchId: user.branchId || null,
     },
     getJwtSecret(),
     { expiresIn: '7d' }
@@ -45,11 +57,16 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
 
   const token = authHeader.split(' ')[1];
   try {
-    const decoded = jwt.verify(token, getJwtSecret()) as AuthUser;
-    
+    const decoded = jwt.verify(token, getJwtSecret()) as any;
+    const targetUserId = decoded.id || decoded.userId;
+
+    if (!targetUserId) {
+      return res.status(401).json({ error: 'Invalid token payload.' });
+    }
+
     // Verify user is still active in database and assigned branch is active
     const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
+      where: { id: targetUserId },
       select: {
         id: true,
         fullName: true,
@@ -102,3 +119,5 @@ export function requireRoles(...allowedRoles: Role[]) {
     next();
   };
 }
+
+export const requireRole = requireRoles;

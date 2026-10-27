@@ -1,9 +1,31 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { apiRequest } from '../../lib/api';
-import { UserPlus, RefreshCw, KeyRound } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useAuth, Branch } from '../../context/AuthContext';
+import { apiRequest, getFileUrl } from '../../lib/api';
+import {
+  Users,
+  UserPlus,
+  RefreshCw,
+  Search,
+  KeyRound,
+  Edit2,
+  Trash2,
+  ShieldCheck,
+  Check,
+  Copy,
+  AlertCircle,
+  X,
+  Phone,
+  Building2,
+  Sparkles,
+  Eye,
+  EyeOff,
+  FileText,
+  Upload,
+  Image as ImageIcon,
+  ExternalLink,
+} from 'lucide-react';
 
 interface StaffUser {
   id: string;
@@ -12,23 +34,56 @@ interface StaffUser {
   role: string;
   branchId: string | null;
   branch?: { id: string; name: string; code: string; isHub: boolean } | null;
-  shift: string;
-  salary: number;
+  shift: string | null;
+  salary: number | string | null;
+  avatarUrl?: string | null;
+  filesUrl?: string | null;
   isActive: boolean;
+  createdAt: string;
 }
 
+interface RoleMetadata {
+  role: string;
+  label: string;
+  category: string;
+  description: string;
+  badgeColor: string;
+}
+
+const SHIFT_OPTIONS = [
+  { value: 'DAY', label: 'Day Shift' },
+  { value: 'NIGHT', label: 'Night Shift' },
+];
+
 export default function UsersPage() {
-  const { branches, company, user: currentUser } = useAuth();
+  const { branches, user: currentUser } = useAuth();
   const [users, setUsers] = useState<StaffUser[]>([]);
+  const [roles, setRoles] = useState<RoleMetadata[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'ROSTER' | 'ROLES'>('ROSTER');
+
+  // Filters
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>('ALL');
+  const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('ALL');
+
+  // Modal States
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState<StaffUser | null>(null);
+  const [editingUser, setEditingUser] = useState<StaffUser | null>(null);
+  const [passwordModalUser, setPasswordModalUser] = useState<StaffUser | null>(null);
+
+  // File Upload State
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  // Password Generator State
   const [newPassword, setNewPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [showPasswordText, setShowPasswordText] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const isOwnerOrAdmin = currentUser?.role === 'OWNER' || currentUser?.role === 'ADMIN' || currentUser?.role === 'BRANCH_MANAGER';
-
-  // Form State for creating a user
+  // Form State
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
@@ -39,40 +94,86 @@ export default function UsersPage() {
     password: '',
   });
 
-  const fetchUsers = async () => {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const isOwnerOrAdmin = currentUser?.role === 'OWNER' || currentUser?.role === 'ADMIN';
+  const isManager = currentUser?.role === 'BRANCH_MANAGER';
+
+  const showNotification = (msg: string) => {
+    setSuccessMessage(msg);
+    setTimeout(() => setSuccessMessage(null), 3500);
+  };
+
+  const fetchUsersAndRoles = async () => {
     setLoading(true);
-    const res = await apiRequest<{ users: StaffUser[] }>('/users');
-    if (res.data?.users) {
-      setUsers(res.data.users);
+    const [usersRes, rolesRes] = await Promise.all([
+      apiRequest<{ users: StaffUser[] }>('/users?includeInactive=true'),
+      apiRequest<{ roles: RoleMetadata[] }>('/users/roles'),
+    ]);
+
+    if (usersRes.data?.users) {
+      setUsers(usersRes.data.users);
+    }
+    if (rolesRes.data?.roles) {
+      setRoles(rolesRes.data.roles);
     }
     setLoading(false);
   };
 
   useEffect(() => {
-    fetchUsers();
+    fetchUsersAndRoles();
   }, []);
 
+  // Quick Password Generator
+  const generateStrongPassword = () => {
+    const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%';
+    let pass = 'H';
+    for (let i = 0; i < 9; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setNewPassword(pass);
+    setFormData((prev) => ({ ...prev, password: pass }));
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // Create Staff Member with PDF and Avatar
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitting(true);
     setError(null);
 
-    if (!formData.password || formData.password.trim().length < 6) {
-      setError('Password must be at least 6 characters.');
-      return;
+    const data = new FormData();
+    data.append('fullName', formData.fullName.trim());
+    data.append('phone', formData.phone.trim());
+    data.append('role', formData.role);
+    data.append('password', formData.password.trim());
+    if (formData.branchId) data.append('branchId', formData.branchId);
+    if (formData.shift) data.append('shift', formData.shift);
+    if (formData.salary) data.append('salary', formData.salary);
+
+    if (docFile) {
+      data.append('file', docFile);
+    }
+    if (avatarFile) {
+      data.append('avatar', avatarFile);
     }
 
-    const payload = {
-      ...formData,
-      salary: formData.salary ? Number(formData.salary) : null,
-    };
-
-    const res = await apiRequest('/users', {
+    const res = await apiRequest<{ user: StaffUser }>('/users', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: data,
     });
 
-    if (res.data) {
+    if (res.data?.user) {
       setShowAddModal(false);
+      setDocFile(null);
+      setAvatarFile(null);
       setFormData({
         fullName: '',
         phone: '',
@@ -82,269 +183,708 @@ export default function UsersPage() {
         salary: '',
         password: '',
       });
-      await fetchUsers();
+      showNotification(`Staff member '${res.data.user.fullName}' registered successfully.`);
+      await fetchUsersAndRoles();
     } else {
       setError(res.error || 'Failed to create staff member');
     }
+    setSubmitting(false);
   };
 
-  const handleResetPassword = async (e: React.FormEvent) => {
+  // Update Staff Member
+  const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!showPasswordModal) return;
+    if (!editingUser) return;
+    setSubmitting(true);
     setError(null);
 
-    if (!newPassword || newPassword.trim().length < 6) {
-      setError('New password must be at least 6 characters.');
-      return;
+    const data = new FormData();
+    data.append('fullName', formData.fullName.trim());
+    data.append('phone', formData.phone.trim());
+    data.append('role', formData.role);
+    if (formData.branchId) data.append('branchId', formData.branchId);
+    if (formData.shift) data.append('shift', formData.shift);
+    if (formData.salary) data.append('salary', formData.salary);
+
+    if (docFile) {
+      data.append('file', docFile);
+    }
+    if (avatarFile) {
+      data.append('avatar', avatarFile);
     }
 
-    const res = await apiRequest(`/users/${showPasswordModal.id}/password`, {
+    const res = await apiRequest<{ user: StaffUser }>(`/users/${editingUser.id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ newPassword: newPassword.trim() }),
+      body: data,
     });
 
-    if (res.data) {
-      setShowPasswordModal(null);
-      setNewPassword('');
-      await fetchUsers();
+    if (res.data?.user) {
+      setEditingUser(null);
+      setDocFile(null);
+      setAvatarFile(null);
+      showNotification(`Staff member '${res.data.user.fullName}' updated.`);
+      await fetchUsersAndRoles();
     } else {
-      setError(res.error || 'Failed to update employee password');
+      setError(res.error || 'Failed to update staff member');
     }
+    setSubmitting(false);
   };
 
-  const currencySymbol = company?.currency || 'ETB';
+  // Reset Password
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordModalUser) return;
+    setSubmitting(true);
+    setError(null);
+
+    const res = await apiRequest(`/users/${passwordModalUser.id}/password`, {
+      method: 'PATCH',
+      body: JSON.stringify({ newPassword }),
+    });
+
+    if (!res.error) {
+      showNotification(`Password for ${passwordModalUser.fullName} has been updated.`);
+      setPasswordModalUser(null);
+      setNewPassword('');
+    } else {
+      setError(res.error || 'Failed to reset password');
+    }
+    setSubmitting(false);
+  };
+
+  // Toggle Active / Deactivate
+  const handleToggleActive = async (targetUser: StaffUser) => {
+    setSubmitting(true);
+    setError(null);
+
+    const res = await apiRequest(`/users/${targetUser.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isActive: !targetUser.isActive }),
+    });
+
+    if (!res.error) {
+      showNotification(
+        `Staff member '${targetUser.fullName}' ${!targetUser.isActive ? 'activated' : 'deactivated'}.`
+      );
+      await fetchUsersAndRoles();
+    } else {
+      setError(res.error || 'Operation failed');
+    }
+    setSubmitting(false);
+  };
+
+  const openEditModal = (u: StaffUser) => {
+    setEditingUser(u);
+    setDocFile(null);
+    setAvatarFile(null);
+    setFormData({
+      fullName: u.fullName,
+      phone: u.phone,
+      role: u.role,
+      branchId: u.branchId || '',
+      shift: u.shift || 'DAY',
+      salary: u.salary ? String(u.salary) : '',
+      password: '',
+    });
+    setError(null);
+  };
+
+  // Filtered Users List
+  const filteredUsers = users.filter((u) => {
+    const matchesSearch =
+      u.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.phone.includes(searchTerm);
+
+    if (!matchesSearch) return false;
+    if (selectedBranchFilter !== 'ALL' && u.branchId !== selectedBranchFilter) return false;
+    if (selectedRoleFilter !== 'ALL' && u.role !== selectedRoleFilter) return false;
+    return true;
+  });
+
+  const getRoleBadge = (roleName: string) => {
+    const found = roles.find((r) => r.role === roleName);
+    const badgeColor = found?.badgeColor || 'bg-slate-100 text-slate-800 border-slate-300';
+    return (
+      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase border ${badgeColor}`}>
+        {found?.label || roleName.replace('_', ' ')}
+      </span>
+    );
+  };
 
   return (
     <div className="space-y-6">
-      {/* Page Title & Actions */}
+      {/* Toast Notification */}
+      {successMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#2C1B10] text-[#FFFDF8] px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2 text-xs font-bold border border-[#EDE4D5] animate-in fade-in slide-in-from-bottom-2">
+          <Check className="w-4 h-4 text-[#E87A18]" />
+          <span>{successMessage}</span>
+        </div>
+      )}
+
+      {/* Header & Tabs */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Staff Roster</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Bakery personnel, assigned branches, shift schedules &amp; credentials
+          <h1 className="text-xl sm:text-2xl font-black text-[#2C1B10] tracking-tight">
+            Staff &amp; Role Settings
+          </h1>
+          <p className="text-xs text-[#8C7361] mt-0.5">
+            Personnel onboarding, Kebele/ID documents (PDF), branch scoping, and role permissions
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={fetchUsers}
-            className="p-2 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 text-xs font-semibold flex items-center gap-1.5"
+            onClick={fetchUsersAndRoles}
+            disabled={loading}
+            className="p-2 rounded-xl bg-white border border-[#EDE4D5] text-[#2C1B10] hover:bg-[#FAF7EE] text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-colors"
             title="Refresh"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
-            Refresh
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
           </button>
 
-          {isOwnerOrAdmin && (
+          {(isOwnerOrAdmin || isManager) && (
             <button
-              onClick={() => setShowAddModal(true)}
-              className="px-3.5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors"
+              onClick={() => {
+                setFormData({
+                  fullName: '',
+                  phone: '',
+                  role: 'CASHIER',
+                  branchId: isManager ? (currentUser?.branchId || '') : '',
+                  shift: 'DAY',
+                  salary: '',
+                  password: '',
+                });
+                setDocFile(null);
+                setAvatarFile(null);
+                setError(null);
+                setShowAddModal(true);
+              }}
+              className="px-3.5 py-2 rounded-xl bg-[#E87A18] hover:bg-[#D96B10] text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors"
             >
               <UserPlus className="w-4 h-4" />
-              Add Staff Member
+              <span>Register Personnel</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Staff Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
-                <th className="py-3 px-4">Staff Name &amp; Phone</th>
-                <th className="py-3 px-4">Role</th>
-                <th className="py-3 px-4">Assigned Branch</th>
-                <th className="py-3 px-4">Shift</th>
-                <th className="py-3 px-4">Salary ({currencySymbol})</th>
-                {isOwnerOrAdmin && <th className="py-3 px-4 text-right">Actions</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {users.map((u) => (
-                <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="py-3.5 px-4 font-semibold text-slate-900">
-                    <div>{u.fullName}</div>
-                    <div className="text-[11px] text-slate-500 font-mono">{u.phone}</div>
-                  </td>
+      {/* Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-[#EDE4D5] pb-2">
+        <button
+          onClick={() => setActiveTab('ROSTER')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'ROSTER'
+              ? 'bg-[#4A2E1B] text-white shadow-sm'
+              : 'text-[#8C7361] hover:text-[#2C1B10] hover:bg-[#FAF7EE]'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>Staff Directory ({users.length})</span>
+        </button>
 
-                  <td className="py-3.5 px-4">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-slate-100 text-slate-700 border border-slate-200">
-                      {u.role.replace('_', ' ')}
-                    </span>
-                  </td>
-
-                  <td className="py-3.5 px-4">
-                    {u.branch ? (
-                      <span className="font-semibold text-slate-800">
-                        {u.branch.name} ({u.branch.code})
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 italic">Global (HQ)</span>
-                    )}
-                  </td>
-
-                  <td className="py-3.5 px-4">
-                    {u.shift ? (
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                          u.shift === 'NIGHT' ? 'bg-indigo-100 text-indigo-800' : 'bg-amber-100 text-amber-800'
-                        }`}
-                      >
-                        {u.shift}
-                      </span>
-                    ) : (
-                      <span className="text-slate-400">&mdash;</span>
-                    )}
-                  </td>
-
-                  <td className="py-3.5 px-4 font-semibold text-slate-700">
-                    {u.salary ? `${currencySymbol} ${Number(u.salary).toLocaleString()}` : '&mdash;'}
-                  </td>
-
-                  {isOwnerOrAdmin && (
-                    <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => setShowPasswordModal(u)}
-                        className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] transition-colors"
-                      >
-                        Reset Password
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <button
+          onClick={() => setActiveTab('ROLES')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'ROLES'
+              ? 'bg-[#4A2E1B] text-white shadow-sm'
+              : 'text-[#8C7361] hover:text-[#2C1B10] hover:bg-[#FAF7EE]'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          <span>Role Permissions ({roles.length})</span>
+        </button>
       </div>
 
-      {/* Add Staff Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-slate-200">
-            <h2 className="text-lg font-black text-slate-900">Add Staff Member</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Register staff with branch assignment and login password</p>
+      {/* TAB 1: STAFF ROSTER */}
+      {activeTab === 'ROSTER' && (
+        <div className="space-y-4">
+          {/* Search & Filters Bar */}
+          <div className="bg-[#FFFDF8] rounded-2xl border border-[#EDE4D5] p-3 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-2xs">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-[#8C7361] absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search staff by full name or phone number..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-[#FAF7EE]/60 border border-[#EDE4D5] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E87A18] font-medium"
+              />
+            </div>
+
+            {/* Filter Dropdowns */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={selectedBranchFilter}
+                onChange={(e) => setSelectedBranchFilter(e.target.value)}
+                className="text-xs font-bold text-[#2C1B10] bg-[#FAF7EE]/60 border border-[#EDE4D5] rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#E87A18]"
+              >
+                <option value="ALL">All Branches</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} ({b.code})
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={selectedRoleFilter}
+                onChange={(e) => setSelectedRoleFilter(e.target.value)}
+                className="text-xs font-bold text-[#2C1B10] bg-[#FAF7EE]/60 border border-[#EDE4D5] rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#E87A18]"
+              >
+                <option value="ALL">All Roles</option>
+                {roles.map((r) => (
+                  <option key={r.role} value={r.role}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Staff Table / List */}
+          {filteredUsers.length === 0 ? (
+            <div className="bg-[#FFFDF8] rounded-2xl border border-[#EDE4D5] p-8 text-center">
+              <Users className="w-10 h-10 text-[#8C7361]/40 mx-auto mb-2" />
+              <h3 className="text-sm font-bold text-[#2C1B10]">No staff members found</h3>
+              <p className="text-xs text-[#8C7361] mt-1">Try clearing your search query or filters.</p>
+            </div>
+          ) : (
+            <div className="bg-[#FFFDF8] rounded-2xl border border-[#EDE4D5] overflow-hidden shadow-2xs">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#FAF7EE] border-b border-[#EDE4D5] text-[#8C7361] uppercase font-black tracking-wider text-[10px]">
+                    <tr>
+                      <th className="px-4 py-3">Employee</th>
+                      <th className="px-4 py-3">Phone (Login)</th>
+                      <th className="px-4 py-3">Role</th>
+                      <th className="px-4 py-3">Assigned Branch</th>
+                      <th className="px-4 py-3">ID Document</th>
+                      <th className="px-4 py-3">Shift &amp; Salary</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#EDE4D5]/70">
+                    {filteredUsers.map((u) => {
+                      const avatarSrc = getFileUrl(u.avatarUrl);
+                      const docSrc = getFileUrl(u.filesUrl);
+
+                      return (
+                        <tr key={u.id} className="hover:bg-[#FAF7EE]/50 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2.5">
+                              {avatarSrc ? (
+                                <img
+                                  src={avatarSrc}
+                                  alt={u.fullName}
+                                  className="w-8 h-8 rounded-full object-cover border border-[#EDE4D5] shrink-0"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#4A2E1B] to-[#E87A18] text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-2xs">
+                                  {u.fullName.charAt(0)}
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="font-extrabold text-[#2C1B10] truncate">{u.fullName}</p>
+                                <span className="text-[10px] text-[#8C7361]">
+                                  Joined {new Date(u.createdAt).toLocaleDateString()}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-3 font-mono font-bold text-[#2C1B10]">
+                            <div className="flex items-center gap-1.5">
+                              <Phone className="w-3 h-3 text-[#8C7361]" />
+                              <span>{u.phone}</span>
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-3">{getRoleBadge(u.role)}</td>
+
+                          <td className="px-4 py-3">
+                            {u.branch ? (
+                              <div className="flex items-center gap-1.5 text-[#2C1B10] font-semibold">
+                                {u.branch.isHub ? (
+                                  <Building2 className="w-3.5 h-3.5 text-teal-700 shrink-0" />
+                                ) : (
+                                  <Building2 className="w-3.5 h-3.5 text-[#E87A18] shrink-0" />
+                                )}
+                                <span>{u.branch.name}</span>
+                              </div>
+                            ) : (
+                              <span className="text-[#8C7361] italic">HQ / All Branches</span>
+                            )}
+                          </td>
+
+                          {/* ID Document (PDF / Image) View */}
+                          <td className="px-4 py-3">
+                            {docSrc ? (
+                              <a
+                                href={docSrc}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors"
+                              >
+                                <FileText className="w-3.5 h-3.5 text-blue-600" />
+                                <span>View Document</span>
+                                <ExternalLink className="w-2.5 h-2.5 text-blue-400" />
+                              </a>
+                            ) : (
+                              <span className="text-[11px] text-[#8C7361] italic">No file attached</span>
+                            )}
+                          </td>
+
+                          <td className="px-4 py-3">
+                            <div className="space-y-0.5">
+                              {u.shift && (
+                                <span className="inline-block px-1.5 py-0.5 text-[9px] font-bold rounded bg-[#F4ECE1] text-[#4A2E1B] uppercase">
+                                  {u.shift} Shift
+                                </span>
+                              )}
+                              <p className="font-bold text-[#2C1B10]">
+                                {u.salary ? `${Number(u.salary).toLocaleString()} ETB` : '—'}
+                              </p>
+                            </div>
+                          </td>
+
+                          <td className="px-4 py-3">
+                            {u.isActive ? (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                Active
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                                Inactive
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              {/* Reset Password */}
+                              <button
+                                onClick={() => {
+                                  setPasswordModalUser(u);
+                                  setNewPassword('');
+                                  setError(null);
+                                }}
+                                className="p-1.5 rounded-lg text-[#8C7361] hover:text-[#E87A18] hover:bg-[#FAF7EE] transition-colors"
+                                title="Reset Password"
+                              >
+                                <KeyRound className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Edit User */}
+                              <button
+                                onClick={() => openEditModal(u)}
+                                className="p-1.5 rounded-lg text-[#8C7361] hover:text-[#2C1B10] hover:bg-[#FAF7EE] transition-colors"
+                                title="Edit Staff"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+
+                              {/* Toggle Active Status */}
+                              {isOwnerOrAdmin && u.id !== currentUser?.id && (
+                                <button
+                                  onClick={() => handleToggleActive(u)}
+                                  className={`p-1.5 rounded-lg transition-colors ${
+                                    u.isActive
+                                      ? 'text-[#8C7361] hover:text-red-600 hover:bg-red-50'
+                                      : 'text-emerald-600 hover:bg-emerald-50'
+                                  }`}
+                                  title={u.isActive ? 'Deactivate' : 'Reactivate'}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 2: ROLES & PERMISSIONS MATRIX */}
+      {activeTab === 'ROLES' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {roles.map((r) => {
+            const userCount = users.filter((u) => u.role === r.role && u.isActive).length;
+            return (
+              <div
+                key={r.role}
+                className="bg-[#FFFDF8] rounded-2xl p-5 border border-[#EDE4D5] shadow-2xs flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-[#8C7361]">
+                      {r.category}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-xs font-black bg-[#FAF7EE] text-[#4A2E1B] border border-[#EDE4D5]">
+                      {userCount} Staff
+                    </span>
+                  </div>
+
+                  <h3 className="text-base font-black text-[#2C1B10] mt-2">{r.label}</h3>
+                  <p className="text-xs text-[#8C7361] mt-1.5 leading-relaxed">{r.description}</p>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-[#EDE4D5] flex items-center justify-between">
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase border ${r.badgeColor}`}>
+                    {r.role}
+                  </span>
+                  <span className="text-[11px] font-bold text-[#8C7361]">Scoped</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add / Edit Staff Modal with Document PDF and Avatar */}
+      {(showAddModal || editingUser) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-[#FFFDF8] rounded-2xl p-6 max-w-lg w-full shadow-2xl border border-[#EDE4D5] max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-black text-[#2C1B10]">
+                  {editingUser ? 'Edit Staff Member' : 'Register New Personnel'}
+                </h2>
+                <p className="text-xs text-[#8C7361] mt-0.5">
+                  {editingUser ? `Updating credentials for ${editingUser.fullName}` : 'Onboard employee with role, branch assignment & identification file'}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAddModal(false);
+                  setEditingUser(null);
+                  setDocFile(null);
+                  setAvatarFile(null);
+                }}
+                className="p-1 rounded-lg text-[#8C7361] hover:text-[#2C1B10]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
             {error && (
-              <div className="mt-3 p-2.5 rounded-lg bg-red-50 text-red-700 text-xs font-medium border border-red-200">
-                {error}
+              <div className="mt-3 p-2.5 rounded-xl bg-red-50 text-red-700 text-xs font-semibold border border-red-200 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{error}</span>
               </div>
             )}
 
-            <form onSubmit={handleCreateUser} className="mt-4 space-y-3.5 text-xs">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Full Name</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Almaz Bekele"
-                    value={formData.fullName}
-                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500"
-                  />
-                </div>
+            <form
+              onSubmit={editingUser ? handleUpdateUser : handleCreateUser}
+              className="mt-4 space-y-4 text-xs"
+            >
+              <div>
+                <label className="block font-bold text-[#2C1B10] mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Almaz Kebede"
+                  value={formData.fullName}
+                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                  className="w-full px-3 py-2 border border-[#EDE4D5] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E87A18] font-medium bg-white"
+                />
+              </div>
 
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Phone Number (Login)</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. 0911223344"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 font-mono"
-                  />
-                </div>
+              <div>
+                <label className="block font-bold text-[#2C1B10] mb-1">Phone Number (Login Username)</label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. 0911223344"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full px-3 py-2 border border-[#EDE4D5] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E87A18] font-mono font-bold bg-white"
+                />
+              </div>
+
+              {/* Role Selection */}
+              <div>
+                <label className="block font-bold text-[#2C1B10] mb-1">Assigned Role</label>
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                  className="w-full px-3 py-2 border border-[#EDE4D5] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E87A18] font-bold bg-white"
+                >
+                  {roles.map((r) => (
+                    <option key={r.role} value={r.role}>
+                      {r.label} ({r.category})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Branch Assignment */}
+              <div>
+                <label className="block font-bold text-[#2C1B10] mb-1">Assigned Branch Outlet</label>
+                <select
+                  value={formData.branchId}
+                  onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
+                  className="w-full px-3 py-2 border border-[#EDE4D5] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E87A18] font-bold bg-white"
+                >
+                  <option value="">HQ / Unrestricted (Owner / Admin Only)</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} ({b.code}) {b.isHub ? '★ Hub' : 'Spoke'}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
+                {/* Shift */}
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Role</label>
+                  <label className="block font-bold text-[#2C1B10] mb-1">Work Shift</label>
                   <select
-                    value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white"
+                    value={formData.shift}
+                    onChange={(e) => setFormData({ ...formData, shift: e.target.value })}
+                    className="w-full px-3 py-2 border border-[#EDE4D5] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E87A18] font-bold bg-white"
                   >
-                    <option value="CASHIER">Cashier (Front POS)</option>
-                    <option value="BRANCH_MANAGER">Branch Manager</option>
-                    <option value="BAKER">Baker (Production)</option>
-                    <option value="PRODUCTION_SUPERVISOR">Production Supervisor</option>
-                    <option value="STOREKEEPER">Storekeeper (Warehouse)</option>
-                    <option value="DRIVER">Driver (Logistics)</option>
-                    <option value="ADMIN">System Admin</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Assigned Branch</label>
-                  <select
-                    value={formData.branchId}
-                    onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white"
-                  >
-                    <option value="">-- Unassigned (HQ / Floating) --</option>
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name} ({b.code})
+                    {SHIFT_OPTIONS.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {s.label}
                       </option>
                     ))}
                   </select>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
+                {/* Salary */}
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Shift</label>
-                  <select
-                    value={formData.shift}
-                    onChange={(e) => setFormData({ ...formData, shift: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500 bg-white"
-                  >
-                    <option value="DAY">Day Shift (06:00 - 18:00)</option>
-                    <option value="NIGHT">Night Shift (18:00 - 06:00)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Monthly Salary ({currencySymbol})</label>
+                  <label className="block font-bold text-[#2C1B10] mb-1">Monthly Salary (ETB)</label>
                   <input
                     type="number"
                     placeholder="e.g. 15000"
                     value={formData.salary}
                     onChange={(e) => setFormData({ ...formData, salary: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500"
+                    className="w-full px-3 py-2 border border-[#EDE4D5] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E87A18] font-bold bg-white"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Login Password (min 6 chars)</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="Set initial password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500"
-                />
+              {/* Identification Document Upload (PDF / Image) */}
+              <div className="p-3.5 rounded-xl border border-[#EDE4D5] bg-[#FAF7EE]/60 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-extrabold text-[#2C1B10] flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-blue-700" />
+                    <span>Identification Document (PDF / Image)</span>
+                  </label>
+                  {editingUser?.filesUrl && (
+                    <a
+                      href={getFileUrl(editingUser.filesUrl) || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-blue-600 hover:underline font-bold"
+                    >
+                      View Current Document
+                    </a>
+                  )}
+                </div>
+                <p className="text-[11px] text-[#8C7361]">
+                  Attach Kebele ID scan, passport, contract, or license (PDF or JPG/PNG/WebP, up to 15MB)
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept=".pdf,image/jpeg,image/png,image/webp,image/jpg"
+                    onChange={(e) => setDocFile(e.target.files?.[0] || null)}
+                    className="w-full text-xs border border-[#EDE4D5] bg-white rounded-xl p-1.5 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-[#4A2E1B] file:text-white hover:file:bg-[#E87A18] cursor-pointer"
+                  />
+                </div>
+                {docFile && (
+                  <p className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5" /> Selected: {docFile.name} ({(docFile.size / 1024).toFixed(1)} KB)
+                  </p>
+                )}
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+              {/* Profile Avatar (Optional) */}
+              <div className="p-3.5 rounded-xl border border-[#EDE4D5] bg-[#FAF7EE]/60 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-extrabold text-[#2C1B10] flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-amber-700" />
+                    <span>Profile Photo <span className="font-normal text-[#8C7361]">(Optional)</span></span>
+                  </label>
+                  {editingUser?.avatarUrl && (
+                    <a
+                      href={getFileUrl(editingUser.avatarUrl) || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-amber-700 hover:underline font-bold"
+                    >
+                      View Current Photo
+                    </a>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  ref={avatarInputRef}
+                  accept="image/jpeg,image/png,image/webp,image/jpg"
+                  onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
+                  className="w-full text-xs border border-[#EDE4D5] bg-white rounded-xl p-1.5 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[11px] file:font-bold file:bg-[#4A2E1B] file:text-white hover:file:bg-[#E87A18] cursor-pointer"
+                />
+                {avatarFile && (
+                  <p className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5" /> Selected: {avatarFile.name} ({(avatarFile.size / 1024).toFixed(1)} KB)
+                  </p>
+                )}
+              </div>
+
+              {/* Password field only when creating new user */}
+              {!editingUser && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-bold text-[#2C1B10]">Initial Password</label>
+                    <button
+                      type="button"
+                      onClick={generateStrongPassword}
+                      className="text-[#E87A18] hover:underline font-bold flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3 h-3" /> Auto Generate
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Min 6 characters"
+                    value={formData.password}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    className="w-full px-3 py-2 border border-[#EDE4D5] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E87A18] font-mono font-bold bg-white"
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-[#EDE4D5]">
                 <button
                   type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="px-3 py-2 rounded-lg border border-slate-200 font-bold text-slate-600 hover:bg-slate-50"
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setEditingUser(null);
+                    setDocFile(null);
+                    setAvatarFile(null);
+                  }}
+                  className="px-3.5 py-2 rounded-xl border border-[#EDE4D5] font-bold text-[#8C7361] hover:bg-[#FAF7EE]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold"
+                  disabled={submitting}
+                  className="px-4 py-2 rounded-xl bg-[#E87A18] hover:bg-[#D96B10] text-white font-bold disabled:opacity-50 shadow-sm"
                 >
-                  Save Staff Member
+                  {submitting ? 'Saving...' : editingUser ? 'Save Changes' : 'Register Personnel'}
                 </button>
               </div>
             </form>
@@ -352,47 +892,83 @@ export default function UsersPage() {
         </div>
       )}
 
-      {/* Reset Password Modal */}
-      {showPasswordModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-200">
-            <h2 className="text-lg font-black text-slate-900">Reset Password</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Set new password for <span className="font-bold text-slate-800">{showPasswordModal.fullName}</span>
+      {/* Password Reset Modal */}
+      {passwordModalUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in">
+          <div className="bg-[#FFFDF8] rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-[#EDE4D5]">
+            <div className="w-10 h-10 rounded-full bg-amber-100 text-[#E87A18] flex items-center justify-center mb-3">
+              <KeyRound className="w-5 h-5" />
+            </div>
+
+            <h2 className="text-base font-black text-[#2C1B10]">Reset Staff Password</h2>
+            <p className="text-xs text-[#8C7361] mt-0.5">
+              Set a new temporary password for <span className="font-bold text-[#2C1B10]">{passwordModalUser.fullName}</span> ({passwordModalUser.phone})
             </p>
 
             {error && (
-              <div className="mt-3 p-2.5 rounded-lg bg-red-50 text-red-700 text-xs font-medium border border-red-200">
+              <div className="mt-3 p-2 rounded-lg bg-red-50 text-red-700 text-xs font-semibold border border-red-200">
                 {error}
               </div>
             )}
 
-            <form onSubmit={handleResetPassword} className="mt-4 space-y-4 text-xs">
+            <form onSubmit={handleResetPassword} className="mt-4 space-y-3 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">New Password (min 6 chars)</label>
-                <input
-                  type="password"
-                  required
-                  placeholder="Enter new password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-amber-500"
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-[#2C1B10]">New Password</label>
+                  <button
+                    type="button"
+                    onClick={generateStrongPassword}
+                    className="text-[#E87A18] hover:underline font-bold flex items-center gap-1"
+                  >
+                    <Sparkles className="w-3 h-3" /> Auto Generate
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <input
+                    type={showPasswordText ? 'text' : 'password'}
+                    required
+                    placeholder="Min 6 characters"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full pl-3 pr-16 py-2 border border-[#EDE4D5] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E87A18] font-mono font-bold bg-white"
+                  />
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowPasswordText(!showPasswordText)}
+                      className="p-1 text-[#8C7361] hover:text-[#2C1B10]"
+                    >
+                      {showPasswordText ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                    {newPassword && (
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(newPassword)}
+                        className="p-1 text-[#8C7361] hover:text-[#2C1B10]"
+                        title="Copy password"
+                      >
+                        {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2 pt-3">
                 <button
                   type="button"
-                  onClick={() => setShowPasswordModal(null)}
-                  className="px-3 py-2 rounded-lg border border-slate-200 font-bold text-slate-600 hover:bg-slate-50"
+                  onClick={() => setPasswordModalUser(null)}
+                  className="px-3 py-1.5 rounded-xl border border-[#EDE4D5] font-bold text-[#8C7361] hover:bg-[#FAF7EE]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-bold"
+                  disabled={submitting || !newPassword}
+                  className="px-3.5 py-1.5 rounded-xl bg-[#E87A18] hover:bg-[#D96B10] text-white font-bold disabled:opacity-50 shadow-xs"
                 >
-                  Update Password
+                  {submitting ? 'Updating...' : 'Set Password'}
                 </button>
               </div>
             </form>

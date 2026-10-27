@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import { authRouter } from './modules/auth/auth.controller.js';
 import { branchesRouter } from './modules/branches/branches.controller.js';
 import { usersRouter } from './modules/users/users.controller.js';
@@ -9,6 +10,9 @@ export const app = express();
 
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+
+// Serve uploaded identification PDFs and avatars statically
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Health check
 app.get('/api/health', (_req, res) => {

@@ -81,12 +81,86 @@ branchesRouter.post('/', authMiddleware, requireRoles(Role.OWNER, Role.ADMIN), a
   const branch = await prisma.branch.create({
     data: {
       companyId: finalCompanyId,
-      name,
-      code: code.toUpperCase(),
+      name: name.trim(),
+      code: code.trim().toUpperCase(),
       isHub: Boolean(isHub),
-      address,
+      address: address ? address.trim() : null,
+    },
+    include: {
+      _count: {
+        select: {
+          users: true,
+          productStocks: true,
+        },
+      },
     },
   });
 
   return res.status(201).json({ branch });
+});
+
+// Update Branch (OWNER / ADMIN only)
+branchesRouter.patch('/:id', authMiddleware, requireRoles(Role.OWNER, Role.ADMIN), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const { name, code, isHub, address, isActive } = req.body;
+
+  const existing = await prisma.branch.findUnique({ where: { id } });
+  if (!existing) {
+    return res.status(404).json({ error: 'Branch not found.' });
+  }
+
+  // If changing code, ensure uniqueness
+  if (code && code.trim().toUpperCase() !== existing.code) {
+    const codeConflict = await prisma.branch.findUnique({ where: { code: code.trim().toUpperCase() } });
+    if (codeConflict) {
+      return res.status(409).json({ error: `Branch code '${code}' is already assigned to another branch.` });
+    }
+  }
+
+  const updated = await prisma.branch.update({
+    where: { id },
+    data: {
+      name: name !== undefined ? name.trim() : undefined,
+      code: code !== undefined ? code.trim().toUpperCase() : undefined,
+      isHub: isHub !== undefined ? Boolean(isHub) : undefined,
+      address: address !== undefined ? (address ? address.trim() : null) : undefined,
+      isActive: isActive !== undefined ? Boolean(isActive) : undefined,
+    },
+    include: {
+      _count: {
+        select: {
+          users: true,
+          productStocks: true,
+        },
+      },
+    },
+  });
+
+  return res.json({ branch: updated });
+});
+
+// Delete / Deactivate Branch (OWNER only)
+branchesRouter.delete('/:id', authMiddleware, requireRoles(Role.OWNER), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+
+  const branch = await prisma.branch.findUnique({
+    where: { id },
+    include: {
+      _count: {
+        select: { users: { where: { isActive: true } } },
+      },
+    },
+  });
+
+  if (!branch) {
+    return res.status(404).json({ error: 'Branch not found.' });
+  }
+
+  // Soft deactivate instead of hard cascade to maintain audit integrity
+  await prisma.branch.update({
+    where: { id },
+    data: { isActive: false },
+  });
+
+  return res.json({ message: `Branch '${branch.name}' has been deactivated.` });
 });

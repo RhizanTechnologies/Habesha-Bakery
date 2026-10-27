@@ -74,8 +74,12 @@ model User {
   isActive     Boolean   @default(true)
   salary       Decimal?  @db.Decimal(12, 2)
   shift        Shift?
+  avatarUrl    String?
+  filesUrl     String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+
+  passwordResetRequests PasswordResetRequest[]
 
   @@index([branchId])
   @@index([role])
@@ -130,4 +134,24 @@ model AuditLog {
 
   @@index([userId])
   @@index([branchId])
+}
+
+enum ResetRequestStatus {
+  PENDING
+  RESOLVED
+  REJECTED
+}
+
+model PasswordResetRequest {
+  id               String             @id @default(cuid())
+  userId           String
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone            String
+  status           ResetRequestStatus @default(PENDING)
+  requestedAt      DateTime           @default(now())
+  resolvedAt       DateTime?
+  resolvedByUserId String?
+
+  @@index([userId])
+  @@index([status])
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { apiRequest } from '../lib/api';
 
 export interface Company {
@@ -36,18 +36,29 @@ export interface User {
   branch?: Branch | null;
   salary?: number | null;
   shift?: string | null;
+  avatarUrl?: string | null;
+  filesUrl?: string | null;
+  isActive?: boolean;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: User;
 }
 
 interface AuthContextType {
   company: Company | null;
   user: User | null;
   token: string | null;
+  isAuthenticated: boolean;
   branches: Branch[];
   activeBranch: Branch | null;
   isLoading: boolean;
-  loginWithPassword: (phone: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+  login: (data: LoginResponse) => void;
+  loginWithPassword: (phone: string, pass: string) => Promise<{ success: boolean; user?: User; error?: string }>;
   switchBranch: (branchId: string) => void;
   logout: () => void;
+  updateUser: (updated: Partial<User>) => void;
   refreshBranches: () => Promise<void>;
   refreshCompany: () => Promise<void>;
 }
@@ -62,65 +73,132 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [activeBranch, setActiveBranch] = useState<Branch | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const refreshCompany = async () => {
-    const res = await apiRequest<{ company: Company }>('/company');
-    if (res.data?.company) {
-      setCompany(res.data.company);
-    }
-  };
+  const updateUser = useCallback((updated: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const next = { ...prev, ...updated };
+      try {
+        localStorage.setItem('erp_user', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
 
-  // Load initial session and company profile
+  const refreshCompany = useCallback(async () => {
+    try {
+      const res = await apiRequest<{ company: Company }>('/company');
+      if (res.data?.company) {
+        setCompany(res.data.company);
+      }
+    } catch {}
+  }, []);
+
+  const refreshBranches = useCallback(async () => {
+    try {
+      const res = await apiRequest<{ branches: Branch[] }>('/branches');
+      if (res.data?.branches) {
+        setBranches(res.data.branches);
+
+        if (user?.branch) {
+          setActiveBranch(user.branch);
+        } else {
+          const savedBranchId =
+            localStorage.getItem('selectedBranchId') ||
+            localStorage.getItem('habesha_active_branch_id');
+          const targetBranch =
+            res.data.branches.find((b) => b.id === savedBranchId) ||
+            res.data.branches[0] ||
+            null;
+
+          setActiveBranch(targetBranch);
+        }
+      }
+    } catch {}
+  }, [user]);
+
+  // Load initial session from localStorage
   useEffect(() => {
     refreshCompany();
 
-    const savedToken = localStorage.getItem('habesha_token');
+    const savedToken =
+      localStorage.getItem('token') || localStorage.getItem('habesha_token');
+    const storedUser = localStorage.getItem('erp_user');
+
     if (savedToken) {
       setToken(savedToken);
+
+      // Rehydrate user immediately to prevent flicker
+      if (storedUser) {
+        try {
+          const parsed = JSON.parse(storedUser);
+          setUser(parsed);
+          if (parsed.branch) {
+            setActiveBranch(parsed.branch);
+          }
+        } catch {}
+      }
+
+      // Re-validate session with backend
       apiRequest<{ user: User }>('/auth/me')
         .then((res) => {
-          if (res.data?.user) {
-            setUser(res.data.user);
-            if (res.data.user.branch) {
-              setActiveBranch(res.data.user.branch);
+          const fetchedUser = res.data?.user || (res.data as any);
+          if (fetchedUser && fetchedUser.id) {
+            setUser(fetchedUser);
+            localStorage.setItem('erp_user', JSON.stringify(fetchedUser));
+            if (fetchedUser.branch) {
+              setActiveBranch(fetchedUser.branch);
             }
           } else {
+            // Token is invalid
+            localStorage.removeItem('token');
             localStorage.removeItem('habesha_token');
+            localStorage.removeItem('erp_user');
             setToken(null);
+            setUser(null);
           }
+        })
+        .catch(() => {
+          // If offline or network error, keep stored user state
         })
         .finally(() => setIsLoading(false));
     } else {
+      localStorage.removeItem('erp_user');
       setIsLoading(false);
     }
-  }, []);
+
+    const handleAuthError = () => {
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem('token');
+      localStorage.removeItem('habesha_token');
+      localStorage.removeItem('erp_user');
+    };
+
+    window.addEventListener('auth-error', handleAuthError);
+    return () => window.removeEventListener('auth-error', handleAuthError);
+  }, [refreshCompany]);
 
   // Fetch branches once authenticated
-  const refreshBranches = async () => {
-    const res = await apiRequest<{ branches: Branch[] }>('/branches');
-    if (res.data?.branches) {
-      setBranches(res.data.branches);
-
-      // For staff, their active branch is always their own assigned branch
-      if (user?.branch) {
-        setActiveBranch(user.branch);
-      } else {
-        // For OWNER/ADMIN with no fixed branch, check saved preference or pick first
-        const savedBranchId = localStorage.getItem('habesha_active_branch_id');
-        const targetBranch =
-          res.data.branches.find((b) => b.id === savedBranchId) ||
-          res.data.branches[0] ||
-          null;
-
-        setActiveBranch(targetBranch);
-      }
-    }
-  };
-
   useEffect(() => {
     if (user && token) {
       refreshBranches();
     }
-  }, [user, token]);
+  }, [user, token, refreshBranches]);
+
+  const login = useCallback((data: LoginResponse) => {
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('habesha_token', data.token);
+    try {
+      localStorage.setItem('erp_user', JSON.stringify(data.user));
+    } catch {}
+    setToken(data.token);
+    setUser(data.user);
+    if (data.user.branch) {
+      setActiveBranch(data.user.branch);
+      localStorage.setItem('selectedBranchId', data.user.branch.id);
+      localStorage.setItem('habesha_active_branch_id', data.user.branch.id);
+    }
+  }, []);
 
   const loginWithPassword = async (phone: string, pass: string) => {
     const res = await apiRequest<{ token: string; user: User }>('/auth/login', {
@@ -128,37 +206,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify({ phone, password: pass }),
     });
 
-    if (res.data) {
-      localStorage.setItem('habesha_token', res.data.token);
-      setToken(res.data.token);
-      setUser(res.data.user);
+    const userObj = res.data?.user || (res.data as any);
+    const tokenStr = res.data?.token;
 
-      // Automatically assign user's own branch immediately
-      if (res.data.user.branch) {
-        setActiveBranch(res.data.user.branch);
-        localStorage.setItem('habesha_active_branch_id', res.data.user.branch.id);
-      }
-
-      return { success: true };
+    if (tokenStr && userObj && userObj.id) {
+      login({ token: tokenStr, user: userObj });
+      return { success: true, user: userObj };
     }
 
     return { success: false, error: res.error || 'Login failed' };
   };
 
   const switchBranch = (branchId: string) => {
-    // Only allowed if user is OWNER or ADMIN
     if (user?.role !== 'OWNER' && user?.role !== 'ADMIN') {
       return;
     }
     const found = branches.find((b) => b.id === branchId);
     if (found) {
       setActiveBranch(found);
+      localStorage.setItem('selectedBranchId', found.id);
       localStorage.setItem('habesha_active_branch_id', found.id);
     }
   };
 
   const logout = () => {
+    apiRequest('/auth/logout', { method: 'POST' }).catch(() => {});
+    localStorage.removeItem('token');
     localStorage.removeItem('habesha_token');
+    localStorage.removeItem('erp_user');
+    localStorage.removeItem('selectedBranchId');
     localStorage.removeItem('habesha_active_branch_id');
     setToken(null);
     setUser(null);
@@ -171,12 +247,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         company,
         user,
         token,
+        isAuthenticated: !!user,
         branches,
         activeBranch,
         isLoading,
+        login,
         loginWithPassword,
         switchBranch,
         logout,
+        updateUser,
         refreshBranches,
         refreshCompany,
       }}
