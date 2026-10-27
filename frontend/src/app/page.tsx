@@ -1,284 +1,463 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../context/AuthContext';
+import { apiRequest } from '../lib/api';
 import {
+  ArrowUpRight,
+  ArrowDownRight,
+  ChevronDown,
+  ChevronUp,
   Building2,
-  Store,
   Users,
-  ShieldCheck,
-  Wheat,
+  Store,
+  TrendingUp,
+  Package,
   Receipt,
-  Truck,
   ArrowRight,
-  Flame,
-  Wallet,
+  ShieldCheck,
   CheckCircle2,
+  CalendarDays,
 } from 'lucide-react';
 
+function money(value: number | undefined | null) {
+  return `${Number(value ?? 0).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} ETB`;
+}
+
+interface UserSummary {
+  id: string;
+  fullName: string;
+  phone: string;
+  role: string;
+  branch?: { name: string } | null;
+}
+
 export default function DashboardPage() {
-  const { company, activeBranch, branches } = useAuth();
+  const { user, activeBranch, branches } = useAuth();
+
+  // Expand / Collapse breakdown for the two primary KPI cards
+  const [showGainDetail, setShowGainDetail] = useState(false);
+  const [showExpenseDetail, setShowExpenseDetail] = useState(false);
+
+  // Daily totals
+  const [yesterdayCash] = useState(0);
+  const [salesIncome] = useState(0);
+  const [creditReceived] = useState(0);
+  const [tomorrowCash] = useState(0);
+  const [companyExpense] = useState(0);
+  const [supplierCost] = useState(0);
+  const [payrollCost] = useState(0);
+  const [ownerWithdrawals] = useState(0);
+
+  // Staff summary
+  const [staffList, setStaffList] = useState<UserSummary[]>([]);
+  const [isLoadingStaff, setIsLoadingStaff] = useState(true);
+
+  // Fetch staff count and roster
+  useEffect(() => {
+    apiRequest<{ users: UserSummary[] }>('/users')
+      .then((res) => {
+        if (res.data?.users) {
+          setStaffList(res.data.users);
+        }
+      })
+      .finally(() => setIsLoadingStaff(false));
+  }, []);
+
+  // Today Gain formula: Yesterday + Sales + Credit Received - Tomorrow Leftover
+  const todayGain = yesterdayCash + salesIncome + creditReceived - tomorrowCash;
+  const todayExpense = companyExpense + supplierCost + payrollCost + ownerWithdrawals;
+  const todayNet = todayGain - todayExpense;
 
   const hubBranches = branches.filter((b) => b.isHub);
   const spokeBranches = branches.filter((b) => !b.isHub);
-  const companyName = company?.name || 'Habesha Bakery';
 
   return (
-    <div className="space-y-8">
-      {/* Top Welcome / Hero */}
-      <div className="bg-gradient-to-r from-[#4A2E1B] via-[#5A3A23] to-[#E87A18] text-white rounded-3xl p-6 sm:p-8 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-sm text-xs font-semibold uppercase tracking-wider mb-3">
-              <ShieldCheck className="w-4 h-4 text-[#F4ECE1]" />
-              {companyName} &bull; Enterprise Operations Platform
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white font-heading">
-              Enterprise Hub &amp; Spoke Architecture
-            </h1>
-            <p className="mt-2 text-[#F4ECE1] max-w-2xl text-sm sm:text-base leading-relaxed">
-              Operating across {branches.length} locations ({hubBranches.length} Central Hub{hubBranches.length === 1 ? '' : 's'} and {spokeBranches.length} Retail Spoke{spokeBranches.length === 1 ? '' : 's'}) with branch-scoped data isolation,
-              personnel document verification, and modular feature expansion.
-            </p>
-          </div>
-
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20 min-w-[260px]">
-            <p className="text-xs uppercase font-extrabold text-[#F4ECE1]">Current Branch Context</p>
-            <p className="text-lg font-extrabold mt-1 text-white flex items-center gap-2">
-              {activeBranch?.isHub ? (
-                <Building2 className="w-5 h-5 text-teal-300" />
-              ) : (
-                <Store className="w-5 h-5 text-amber-300" />
-              )}
-              {activeBranch?.name || 'Loading Context...'}
-            </p>
-            <p className="text-xs text-[#F4ECE1]/80 mt-1">
-              Code: {activeBranch?.code || '---'} &bull; {activeBranch?.isHub ? 'Hub Production Facility' : 'Retail Distribution Spoke'}
-            </p>
-          </div>
+    <div className="space-y-6">
+      {/* ── Top Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#EDE4D5]/60">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#2C1B10] tracking-tight font-heading">
+            Executive Dashboard
+          </h1>
+          <p className="text-xs sm:text-sm text-[#8C7361] font-medium mt-1 flex items-center gap-1.5">
+            <CalendarDays className="w-3.5 h-3.5 text-[#E87A18]" />
+            {activeBranch
+              ? `${activeBranch.name} • Operational Overview`
+              : 'All Branches Performance Overview'}
+          </p>
+        </div>
+        <div className="bg-[#FFFDF8] border border-[#EDE4D5] rounded-2xl px-4 py-2 flex items-center space-x-3 shadow-2xs self-start sm:self-auto">
+          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-xs font-bold text-[#4A2E1B]">Live Session Active</span>
         </div>
       </div>
 
-      {/* Foundation Status Badges */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-[#FFFDF8] border border-[#EDE4D5] rounded-2xl p-5 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#8C7361]">
-              Registered Outlets
-            </span>
-            <span className="w-8 h-8 rounded-lg bg-teal-50 text-teal-800 flex items-center justify-center font-bold">
-              <Building2 className="w-4 h-4" />
-            </span>
+      {/* ── Primary Hero Cards: Today's Revenue (Gain) & Today's Expense (Costs) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        {/* TODAY'S REVENUE (GAIN) */}
+        <div>
+          <div
+            onClick={() => setShowGainDetail((prev) => !prev)}
+            className="border border-emerald-200/80 bg-gradient-to-br from-emerald-500/10 via-emerald-50/50 to-white shadow-[0_8px_30px_rgba(16,185,129,0.06)] rounded-3xl p-6 cursor-pointer hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-600/30">
+                  <ArrowUpRight className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-extrabold uppercase text-emerald-800 tracking-wider">
+                    Today&apos;s Revenue (Gain)
+                  </h3>
+                  <p className="text-[11px] text-emerald-700/80 font-medium">
+                    Calculated Daily Cash Inflow &amp; Sales
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="hidden sm:inline-flex px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  Live Sales
+                </span>
+                <button
+                  type="button"
+                  className="text-emerald-800 hover:bg-emerald-100/50 p-1 rounded-xl transition-colors"
+                >
+                  {showGainDetail ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 text-3xl sm:text-4xl font-extrabold text-emerald-950 tracking-tight font-heading font-mono">
+              {money(todayGain)}
+            </div>
+
+            <div className="flex items-center justify-between mt-4 pt-3 border-t border-emerald-100 text-xs">
+              <span className="font-bold text-emerald-700">
+                {showGainDetail ? 'Click to hide formula breakdown' : 'Click to view formula breakdown'}
+              </span>
+              <span className="font-semibold text-emerald-600 flex items-center gap-1">
+                Active Outlet: {activeBranch?.name || 'All Branches'}
+              </span>
+            </div>
           </div>
-          <p className="text-2xl font-black text-[#2C1B10] mt-2">
+
+          {/* GAIN DETAIL EXPANDABLE ACCORDION */}
+          {showGainDetail && (
+            <div className="mt-3 border border-emerald-200 bg-white shadow-lg rounded-3xl overflow-hidden animate-in fade-in duration-200">
+              <div className="p-4 bg-emerald-50/70 border-b border-emerald-100">
+                <h4 className="text-sm font-extrabold text-emerald-950">Revenue Formula Itemization</h4>
+                <p className="text-xs text-emerald-800 mt-0.5">
+                  [Yesterday Leftover] + [Sales Income] + [Credit Repaid] − [Tomorrow Leftover]
+                </p>
+              </div>
+              <div className="p-4 bg-emerald-50/30 space-y-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                  <div className="p-3 bg-white rounded-2xl border border-emerald-200 shadow-2xs flex items-center justify-between">
+                    <div>
+                      <span className="font-extrabold text-emerald-900 block">➕ Yesterday Leftover Cash</span>
+                      <span className="text-[11px] text-[#8C7361]">Opening counter cash</span>
+                    </div>
+                    <span className="font-bold text-emerald-900 font-mono">{money(yesterdayCash)}</span>
+                  </div>
+                  <div className="p-3 bg-white rounded-2xl border border-emerald-200 shadow-2xs flex items-center justify-between">
+                    <div>
+                      <span className="font-extrabold text-emerald-900 block">➕ Income From Sales</span>
+                      <span className="text-[11px] text-[#8C7361]">Daily counter receipts</span>
+                    </div>
+                    <span className="font-bold text-emerald-900 font-mono">{money(salesIncome)}</span>
+                  </div>
+                  <div className="p-3 bg-white rounded-2xl border border-emerald-200 shadow-2xs flex items-center justify-between">
+                    <div>
+                      <span className="font-extrabold text-emerald-900 block">➕ Credit Received From Loans</span>
+                      <span className="text-[11px] text-[#8C7361]">Customer debt repayments</span>
+                    </div>
+                    <span className="font-bold text-emerald-900 font-mono">{money(creditReceived)}</span>
+                  </div>
+                  <div className="p-3 bg-white rounded-2xl border border-rose-200 shadow-2xs flex items-center justify-between">
+                    <div>
+                      <span className="font-extrabold text-rose-900 block">➖ Tomorrow Leftover Cash</span>
+                      <span className="text-[11px] text-[#8C7361]">Retained counter float</span>
+                    </div>
+                    <span className="font-bold text-rose-900 font-mono">{money(tomorrowCash)}</span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-emerald-900 text-white rounded-2xl flex items-center justify-between font-extrabold text-sm shadow-sm">
+                  <span className="uppercase tracking-wider text-xs">🟰 Total Daily Revenue:</span>
+                  <span className="text-base sm:text-lg font-black text-emerald-300 font-mono">
+                    {money(todayGain)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* TODAY'S EXPENSE (COSTS) */}
+        <div>
+          <div
+            onClick={() => setShowExpenseDetail((prev) => !prev)}
+            className="border border-rose-200/80 bg-gradient-to-br from-rose-500/10 via-rose-50/50 to-white shadow-[0_8px_30px_rgba(244,63,94,0.06)] rounded-3xl p-6 cursor-pointer hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white flex items-center justify-center shadow-lg shadow-rose-600/30">
+                  <ArrowDownRight className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-extrabold uppercase text-rose-800 tracking-wider">
+                    Today&apos;s Expense (Costs)
+                  </h3>
+                  <p className="text-[11px] text-rose-700/80 font-medium">
+                    Operating Costs, Purchases &amp; Deductions
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="hidden sm:inline-flex px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300">
+                  Operating Costs
+                </span>
+                <button
+                  type="button"
+                  className="text-rose-800 hover:bg-rose-100/50 p-1 rounded-xl transition-colors"
+                >
+                  {showExpenseDetail ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-4 text-3xl sm:text-4xl font-extrabold text-rose-950 tracking-tight font-heading font-mono">
+              {money(todayExpense)}
+            </div>
+
+            <div className="flex items-center justify-between mt-4 pt-3 border-t border-rose-100 text-xs">
+              <span className="font-bold text-rose-700">
+                {showExpenseDetail ? 'Click to hide cost itemization' : 'Click to view cost itemization'}
+              </span>
+              <span className="font-semibold text-rose-600">
+                Authorized Cash Outflows
+              </span>
+            </div>
+          </div>
+
+          {/* EXPENSE DETAIL EXPANDABLE ACCORDION */}
+          {showExpenseDetail && (
+            <div className="mt-3 border border-rose-200 bg-white shadow-lg rounded-3xl overflow-hidden animate-in fade-in duration-200">
+              <div className="p-4 bg-rose-50/70 border-b border-rose-100">
+                <h4 className="text-sm font-bold text-rose-900">Operating Outflow Breakdown</h4>
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                  <div className="p-3 bg-rose-50/60 rounded-2xl border border-rose-100">
+                    <div className="text-rose-700 font-semibold mb-0.5">Company Petty</div>
+                    <div className="font-extrabold text-rose-950 text-sm font-mono">{money(companyExpense)}</div>
+                  </div>
+                  <div className="p-3 bg-purple-50/60 rounded-2xl border border-purple-100">
+                    <div className="text-purple-700 font-semibold mb-0.5">Owner Drawings</div>
+                    <div className="font-extrabold text-purple-950 text-sm font-mono">{money(ownerWithdrawals)}</div>
+                  </div>
+                  <div className="p-3 bg-amber-50/60 rounded-2xl border border-amber-100">
+                    <div className="text-amber-800 font-semibold mb-0.5">Supplier Material</div>
+                    <div className="font-extrabold text-amber-950 text-sm font-mono">{money(supplierCost)}</div>
+                  </div>
+                  <div className="p-3 bg-indigo-50/60 rounded-2xl border border-indigo-100">
+                    <div className="text-indigo-700 font-semibold mb-0.5">Payroll Paid</div>
+                    <div className="font-extrabold text-indigo-950 text-sm font-mono">{money(payrollCost)}</div>
+                  </div>
+                </div>
+
+                <div className="p-3.5 bg-[#4A2E1B] text-white rounded-2xl flex items-center justify-between font-extrabold text-sm shadow-sm">
+                  <span className="uppercase tracking-wider text-xs">🟰 Total Operating Expenses:</span>
+                  <span className="text-base sm:text-lg font-black text-rose-300 font-mono">
+                    {money(todayExpense)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Secondary KPI Stats Row ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Net Profit Today */}
+        <div className="border border-[#EDE4D5] bg-white rounded-3xl p-5 shadow-2xs hover:shadow-md transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase text-[#8C7361] tracking-wider">
+              Net Profit Today
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-700 flex items-center justify-center">
+              <TrendingUp className="h-4 w-4" />
+            </div>
+          </div>
+          <div className={`text-xl sm:text-2xl font-extrabold tracking-tight font-heading mt-2 font-mono ${todayNet >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+            {money(todayNet)}
+          </div>
+          <p className="text-[11px] text-[#8C7361] font-semibold mt-1">
+            Revenue minus operating expenses
+          </p>
+        </div>
+
+        {/* Active Branches */}
+        <div className="border border-[#EDE4D5] bg-white rounded-3xl p-5 shadow-2xs hover:shadow-md transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase text-[#8C7361] tracking-wider">
+              Network Branches
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center">
+              <Building2 className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-xl sm:text-2xl font-extrabold text-[#2C1B10] tracking-tight font-heading mt-2">
+            {branches.length} Outlets
+          </div>
+          <p className="text-[11px] text-[#8C7361] font-semibold mt-1">
             {hubBranches.length} Hub{hubBranches.length === 1 ? '' : 's'} + {spokeBranches.length} Spoke{spokeBranches.length === 1 ? '' : 's'}
           </p>
-          <p className="text-xs text-[#8C7361] mt-1 truncate">
-            {branches.map((b) => b.name).join(', ') || 'Synchronizing with database...'}
+        </div>
+
+        {/* Registered Staff */}
+        <div className="border border-[#EDE4D5] bg-white rounded-3xl p-5 shadow-2xs hover:shadow-md transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase text-[#8C7361] tracking-wider">
+              Staff on Roster
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center">
+              <Users className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-xl sm:text-2xl font-extrabold text-[#2C1B10] tracking-tight font-heading mt-2">
+            {isLoadingStaff ? '...' : `${staffList.length} Personnel`}
+          </div>
+          <p className="text-[11px] text-[#8C7361] font-semibold mt-1">
+            Verified with Kebele ID &amp; Roles
           </p>
         </div>
 
-        <div className="bg-[#FFFDF8] border border-[#EDE4D5] rounded-2xl p-5 shadow-2xs">
+        {/* Active Outlet Context */}
+        <div className="border border-[#EDE4D5] bg-white rounded-3xl p-5 shadow-2xs hover:shadow-md transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#8C7361]">Branch Security</span>
-            <span className="w-8 h-8 rounded-lg bg-amber-50 text-[#E87A18] flex items-center justify-center font-bold">
-              <ShieldCheck className="w-4 h-4" />
+            <span className="text-xs font-bold uppercase text-[#8C7361] tracking-wider">
+              Current Context
             </span>
+            <div className="w-8 h-8 rounded-xl bg-orange-50 text-[#E87A18] flex items-center justify-center">
+              <Store className="h-4 w-4" />
+            </div>
           </div>
-          <p className="text-2xl font-black text-[#2C1B10] mt-2">Zero-Trust Isolation</p>
-          <p className="text-xs text-[#8C7361] mt-1">Automatic branch scoping on staff authentication</p>
-        </div>
-
-        <div className="bg-[#FFFDF8] border border-[#EDE4D5] rounded-2xl p-5 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#8C7361]">Personnel Documentation</span>
-            <span className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold">
-              <CheckCircle2 className="w-4 h-4" />
-            </span>
+          <div className="text-lg sm:text-xl font-extrabold text-[#2C1B10] tracking-tight font-heading mt-2 truncate">
+            {activeBranch?.name || 'All Locations'}
           </div>
-          <p className="text-2xl font-black text-[#2C1B10] mt-2">Verified Roster</p>
-          <p className="text-xs text-[#8C7361] mt-1">Official Kebele ID &amp; contract PDF storage active</p>
-        </div>
-
-        <div className="bg-[#FFFDF8] border border-[#EDE4D5] rounded-2xl p-5 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#8C7361]">Enterprise Staff</span>
-            <span className="w-8 h-8 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center font-bold">
-              <Users className="w-4 h-4" />
-            </span>
-          </div>
-          <p className="text-2xl font-black text-[#2C1B10] mt-2">
-            {company?.totalUsers ?? branches.reduce((acc, b) => acc + (b._count?.users ?? 0), 0)} Assigned
+          <p className="text-[11px] text-[#8C7361] font-semibold mt-1 truncate">
+            {activeBranch?.code ? `Code: ${activeBranch.code}` : 'Global Enterprise Scope'}
           </p>
-          <p className="text-xs text-[#8C7361] mt-1">8 Enterprise roles configured across shifts</p>
         </div>
       </div>
 
-      {/* The Branches Grid */}
-      <div className="bg-[#FFFDF8] border border-[#EDE4D5] rounded-3xl p-6 shadow-2xs">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-lg font-black text-[#2C1B10] font-heading">Configured Bakery Branches</h2>
-            <p className="text-xs text-[#8C7361]">Live production hubs and retail outlets loaded from Neon PostgreSQL</p>
-          </div>
-          <Link
-            href="/branches"
-            className="text-xs font-bold text-[#E87A18] hover:text-[#D96B10] flex items-center gap-1"
-          >
-            Manage Branches <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-          {/* Central Hubs Cards */}
-          {hubBranches.map((hub) => (
-            <div key={hub.id} className="rounded-2xl border-2 border-teal-500 bg-teal-50/40 p-4 relative">
-              <span className="absolute top-3 right-3 text-[10px] font-black uppercase px-2 py-0.5 rounded bg-teal-800 text-white">
-                Central Hub
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-teal-100 text-teal-800 flex items-center justify-center mb-3">
+      {/* ── Operational Management Overviews: Branch Directory & Staff Roster ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Branch Network List */}
+        <div className="border border-[#EDE4D5] bg-white rounded-3xl p-6 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#EDE4D5]">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-[#FAF7EE] border border-[#EDE4D5] flex items-center justify-center text-[#4A2E1B]">
                 <Building2 className="w-4 h-4" />
               </div>
-              <p className="font-extrabold text-[#2C1B10] text-sm">{hub.name}</p>
-              <p className="text-[11px] font-bold text-[#8C7361] mt-0.5">Code: {hub.code}</p>
-              <p className="text-xs text-[#8C7361] mt-2">{hub.address || 'Central production facility & flour warehouse'}</p>
-            </div>
-          ))}
-
-          {/* Spokes Cards */}
-          {spokeBranches.map((spoke) => (
-            <div key={spoke.id} className="rounded-2xl border border-[#EDE4D5] bg-[#FAF7EE]/50 p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="w-8 h-8 rounded-xl bg-amber-100 text-[#E87A18] flex items-center justify-center">
-                  <Store className="w-4 h-4" />
-                </div>
-                <span className="text-[10px] font-bold text-[#4A2E1B] bg-[#F4ECE1] px-1.5 py-0.5 rounded border border-[#EDE4D5]">
-                  Spoke
-                </span>
-              </div>
-              <p className="font-extrabold text-[#2C1B10] text-sm">{spoke.name}</p>
-              <p className="text-[11px] font-bold text-[#8C7361] mt-0.5">Code: {spoke.code}</p>
-              <p className="text-xs text-[#8C7361] mt-2">{spoke.address || 'Retail counter & local stock receiving'}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Operational Plugins Section */}
-      <div>
-        <div className="mb-4">
-          <h2 className="text-lg font-black text-[#2C1B10] font-heading">Operational Plug-in Modules</h2>
-          <p className="text-xs text-[#8C7361]">
-            Ready to be activated and migrated step-by-step on top of this foundation
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Baking & Supply Plug-in */}
-          <div className="bg-[#FFFDF8] border-2 border-[#EDE4D5] rounded-3xl p-6 shadow-2xs hover:border-[#E87A18]/60 transition-colors">
-            <div className="flex items-center justify-between">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-100 text-[#4A2E1B] text-xs font-bold border border-[#EDE4D5]">
-                <Wheat className="w-3.5 h-3.5 text-[#E87A18]" />
-                BAKING &amp; SUPPLY PLUGIN
-              </div>
-              <span className="text-xs font-bold text-[#8C7361]">Production &amp; Logistics</span>
-            </div>
-
-            <h3 className="text-xl font-black text-[#2C1B10] mt-4 font-heading">
-              Baking Engine, Yield Physics &amp; Crate Transfers
-            </h3>
-            <p className="text-xs text-[#8C7361] mt-1 leading-relaxed">
-              Handles raw material warehouse intake, oven batches, recipe yield formulas, and driver bread dispatch to spokes.
-            </p>
-
-            <div className="mt-5 space-y-3">
-              <div className="flex items-start gap-2.5 text-xs text-[#2C1B10] bg-[#FAF7EE] p-3 rounded-xl border border-[#EDE4D5]">
-                <Wheat className="w-4 h-4 text-[#E87A18] mt-0.5 shrink-0" />
-                <div>
-                  <span className="font-extrabold">Raw Material Warehouse:</span> Flour bags, yeast, salt, oil intake &amp; deduction.
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5 text-xs text-[#2C1B10] bg-[#FAF7EE] p-3 rounded-xl border border-[#EDE4D5]">
-                <Flame className="w-4 h-4 text-[#E87A18] mt-0.5 shrink-0" />
-                <div>
-                  <span className="font-extrabold">Baking Physics Engine:</span> 100kg flour &rarr; standard 1,362 loaf yield formula.
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5 text-xs text-[#2C1B10] bg-[#FAF7EE] p-3 rounded-xl border border-[#EDE4D5]">
-                <Truck className="w-4 h-4 text-[#E87A18] mt-0.5 shrink-0" />
-                <div>
-                  <span className="font-extrabold">40-Loaf Crate Transfers:</span> Manifest creation, driver dispatch, and spoke receiving handshake.
-                </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-[#2C1B10]">Branch Network</h3>
+                <p className="text-[11px] text-[#8C7361]">Central Hubs and Retail Spokes</p>
               </div>
             </div>
-
-            <div className="mt-6 pt-4 border-t border-[#EDE4D5] flex items-center justify-between">
-              <div className="text-[11px] text-[#8C7361] font-mono">
-                Modules: stock, production, transfers
-              </div>
-              <Link
-                href="/production"
-                className="text-xs font-bold text-[#E87A18] hover:text-[#D96B10] flex items-center gap-1"
-              >
-                View Screen Specs <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
+            <Link
+              href="/branches"
+              className="text-xs font-bold text-[#E87A18] hover:text-[#D96B10] flex items-center gap-1 hover:underline"
+            >
+              Manage Branches <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
 
-          {/* Sales & Retail POS Plug-in */}
-          <div className="bg-[#FFFDF8] border-2 border-[#EDE4D5] rounded-3xl p-6 shadow-2xs hover:border-[#E87A18]/60 transition-colors">
-            <div className="flex items-center justify-between">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-50 text-teal-900 text-xs font-bold border border-teal-200">
-                <Receipt className="w-3.5 h-3.5 text-teal-700" />
-                SALES &amp; POS PLUGIN
-              </div>
-              <span className="text-xs font-bold text-[#8C7361]">Retail POS &amp; Cash Flow</span>
-            </div>
-
-            <h3 className="text-xl font-black text-[#2C1B10] mt-4 font-heading">
-              Counter POS, Multi-Tender &amp; Daily Closeout
-            </h3>
-            <p className="text-xs text-[#8C7361] mt-1 leading-relaxed">
-              Handles front counter touchscreen, 58mm thermal receipts, cafe credit sales, and evening cash reconciliation.
-            </p>
-
-            <div className="mt-5 space-y-3">
-              <div className="flex items-start gap-2.5 text-xs text-[#2C1B10] bg-[#FAF7EE] p-3 rounded-xl border border-[#EDE4D5]">
-                <Receipt className="w-4 h-4 text-teal-700 mt-0.5 shrink-0" />
-                <div>
-                  <span className="font-extrabold">Touchscreen POS:</span> Fast-tap bread tiles, quantity selector, customer selection.
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5 text-xs text-[#2C1B10] bg-[#FAF7EE] p-3 rounded-xl border border-[#EDE4D5]">
-                <Wallet className="w-4 h-4 text-teal-700 mt-0.5 shrink-0" />
-                <div>
-                  <span className="font-extrabold">Multi-Tender Payments:</span> Cash, CBE Birr, Telebirr, Mobile Banking, and Credit.
-                </div>
-              </div>
-
-              <div className="flex items-start gap-2.5 text-xs text-[#2C1B10] bg-[#FAF7EE] p-3 rounded-xl border border-[#EDE4D5]">
-                <CheckCircle2 className="w-4 h-4 text-teal-700 mt-0.5 shrink-0" />
-                <div>
-                  <span className="font-extrabold">Evening Closeout Math:</span> Counted cash vs system calculated cash &amp; leftover count.
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 pt-4 border-t border-[#EDE4D5] flex items-center justify-between">
-              <div className="text-[11px] text-[#8C7361] font-mono">
-                Modules: products, pos, daily-tracking
-              </div>
-              <Link
-                href="/pos"
-                className="text-xs font-bold text-[#E87A18] hover:text-[#D96B10] flex items-center gap-1"
+          <div className="space-y-2">
+            {branches.map((b) => (
+              <div
+                key={b.id}
+                className="flex items-center justify-between p-3 rounded-2xl bg-[#FAF7EE]/50 hover:bg-[#FAF7EE] border border-[#EDE4D5]/80 transition-colors"
               >
-                View Screen Specs <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-[#2C1B10] truncate">{b.name}</span>
+                    <span
+                      className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                        b.isHub
+                          ? 'bg-teal-50 text-teal-800 border-teal-200'
+                          : 'bg-amber-50 text-amber-800 border-amber-200'
+                      }`}
+                    >
+                      {b.isHub ? 'Hub Facility' : 'Retail Spoke'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#8C7361] font-mono mt-0.5">Code: {b.code}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="text-[11px] font-semibold text-emerald-800">Active</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Staff Directory Summary */}
+        <div className="border border-[#EDE4D5] bg-white rounded-3xl p-6 shadow-2xs space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#EDE4D5]">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-[#FAF7EE] border border-[#EDE4D5] flex items-center justify-center text-[#4A2E1B]">
+                <Users className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-[#2C1B10]">Active Personnel</h3>
+                <p className="text-[11px] text-[#8C7361]">Verified Team &amp; Role Assignments</p>
+              </div>
             </div>
+            <Link
+              href="/users"
+              className="text-xs font-bold text-[#E87A18] hover:text-[#D96B10] flex items-center gap-1 hover:underline"
+            >
+              Staff Directory <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="space-y-2">
+            {isLoadingStaff ? (
+              <div className="p-8 text-center text-xs text-[#8C7361]">Loading team roster...</div>
+            ) : staffList.length === 0 ? (
+              <div className="p-8 text-center text-xs text-[#8C7361]">No personnel registered yet.</div>
+            ) : (
+              staffList.slice(0, 5).map((s) => (
+                <div
+                  key={s.id}
+                  className="flex items-center justify-between p-3 rounded-2xl bg-[#FAF7EE]/50 hover:bg-[#FAF7EE] border border-[#EDE4D5]/80 transition-colors"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-[#2C1B10] truncate">{s.fullName}</span>
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#E87A18]/10 text-[#E87A18] border border-[#E87A18]/20">
+                        {s.role}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#8C7361] mt-0.5">
+                      {s.branch?.name ? `Branch: ${s.branch.name}` : 'HQ / Global'} &bull; {s.phone}
+                    </p>
+                  </div>
+                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                    Active
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>
