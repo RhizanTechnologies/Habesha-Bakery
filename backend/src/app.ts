@@ -5,6 +5,7 @@ import { authRouter } from './modules/auth/auth.controller.js';
 import { branchesRouter } from './modules/branches/branches.controller.js';
 import { usersRouter } from './modules/users/users.controller.js';
 import { companyRouter } from './modules/company/company.controller.js';
+import { inventoryRouter } from './modules/inventory/inventory.controller.js';
 
 export const app = express();
 
@@ -29,6 +30,7 @@ app.use('/api/company', companyRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/branches', branchesRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/inventory', inventoryRouter);
 
 // 404 handler
 app.use((_req, res) => {
