@@ -211,14 +211,14 @@ usersRouter.get('/:id', authMiddleware, async (req: AuthRequest, res: Response) 
   return res.json({ user });
 });
 
-// 4. Create Staff User (OWNER / ADMIN / BRANCH_MANAGER) with PDF Document & Avatar support
+// 4. Create Staff User (OWNER / ADMIN / BRANCH_MANAGER) with PDF Document, Avatar & Dual-PIN support
 usersRouter.post(
   '/',
   authMiddleware,
   requireRoles(Role.OWNER, Role.ADMIN, Role.BRANCH_MANAGER),
   handleUserFormUpload,
   async (req: AuthRequest, res: Response) => {
-    const { fullName, phone, password, role, branchId, salary, shift } = req.body;
+    const { fullName, phone, password, pin, managerApprovalPin, role, branchId, salary, shift } = req.body;
 
     if (!fullName || !phone || !role) {
       return res.status(400).json({ error: 'Full name, phone number, and role are required.' });
@@ -226,6 +226,24 @@ usersRouter.post(
 
     if (!password || password.trim().length < 6) {
       return res.status(400).json({ error: 'A password with a minimum of 6 characters is required.' });
+    }
+
+    let pinHash: string | null = null;
+    if (pin) {
+      const pinStr = pin.toString().trim();
+      if (!/^\d{4}$/.test(pinStr)) {
+        return res.status(400).json({ error: 'Staff quick PIN must be exactly 4 digits.' });
+      }
+      pinHash = await bcrypt.hash(pinStr, 10);
+    }
+
+    let managerApprovalPinHash: string | null = null;
+    if (managerApprovalPin) {
+      const pinStr = managerApprovalPin.toString().trim();
+      if (!/^\d{6}$/.test(pinStr)) {
+        return res.status(400).json({ error: 'Manager approval code must be exactly 6 digits.' });
+      }
+      managerApprovalPinHash = await bcrypt.hash(pinStr, 10);
     }
 
     if (!Object.values(Role).includes(role as Role)) {
@@ -272,6 +290,8 @@ usersRouter.post(
         fullName: fullName.trim(),
         phone: phone.trim(),
         passwordHash,
+        pinHash,
+        managerApprovalPinHash,
         role: role as Role,
         branchId: finalBranchId || null,
         salary: salary ? Number(salary) : null,
@@ -409,7 +429,58 @@ usersRouter.patch('/:id/password', authMiddleware, requireRoles(Role.OWNER, Role
   return res.json({ message: `Password for ${targetUser.fullName} updated successfully.` });
 });
 
-// 7. Deactivate Staff Member
+// 7. Admin / Manager Reset Staff Dual-PINs (4-digit quick PIN & 6-digit approval code)
+usersRouter.patch('/:id/pins', authMiddleware, requireRoles(Role.OWNER, Role.ADMIN, Role.BRANCH_MANAGER), async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const { pin, managerApprovalPin } = req.body;
+
+  const targetUser = await prisma.user.findUnique({ where: { id } });
+  if (!targetUser) {
+    return res.status(404).json({ error: 'User not found.' });
+  }
+
+  if (req.user!.role === Role.BRANCH_MANAGER && targetUser.branchId !== req.user!.branchId) {
+    return res.status(403).json({ error: 'Permission denied: Cannot edit staff in another branch.' });
+  }
+
+  const updateData: any = {};
+
+  if (pin !== undefined) {
+    if (pin === null || pin === '') {
+      updateData.pinHash = null;
+    } else {
+      const pinStr = pin.toString().trim();
+      if (!/^\d{4}$/.test(pinStr)) {
+        return res.status(400).json({ error: 'Staff quick PIN must be exactly 4 digits.' });
+      }
+      updateData.pinHash = await bcrypt.hash(pinStr, 10);
+    }
+  }
+
+  if (managerApprovalPin !== undefined) {
+    if (req.user!.role !== Role.OWNER && req.user!.role !== Role.ADMIN) {
+      return res.status(403).json({ error: 'Only Owner or Admin can assign manager approval codes.' });
+    }
+    if (managerApprovalPin === null || managerApprovalPin === '') {
+      updateData.managerApprovalPinHash = null;
+    } else {
+      const pinStr = managerApprovalPin.toString().trim();
+      if (!/^\d{6}$/.test(pinStr)) {
+        return res.status(400).json({ error: 'Manager approval code must be exactly 6 digits.' });
+      }
+      updateData.managerApprovalPinHash = await bcrypt.hash(pinStr, 10);
+    }
+  }
+
+  await prisma.user.update({
+    where: { id },
+    data: updateData,
+  });
+
+  return res.json({ message: `Security PINs for ${targetUser.fullName} updated successfully.` });
+});
+
+// 8. Deactivate Staff Member
 usersRouter.delete('/:id', authMiddleware, requireRoles(Role.OWNER, Role.ADMIN), async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
 

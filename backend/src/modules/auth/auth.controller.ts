@@ -25,6 +25,8 @@ function formatUserDto(user: any) {
     phone: user.phone,
     role: user.role,
     branchId: user.branchId,
+    hasPin: !!user.pinHash,
+    hasManagerApprovalPin: !!user.managerApprovalPinHash,
     branch: user.branch
       ? {
           id: user.branch.id,
@@ -45,7 +47,7 @@ function formatUserDto(user: any) {
   };
 }
 
-// Standard Phone + Password Login
+// 1. Standard Phone + Password Login
 authRouter.post('/login', async (req: Request, res: Response) => {
   try {
     const { phone, password } = req.body;
@@ -57,7 +59,6 @@ authRouter.post('/login', async (req: Request, res: Response) => {
 
     const clean = normalizePhone(phoneTrim);
 
-    // Search by exact phone or normalized phone
     const user = await prisma.user.findFirst({
       where: {
         OR: [{ phone: phoneTrim }, { phone: clean }],
@@ -114,7 +115,145 @@ authRouter.post('/login', async (req: Request, res: Response) => {
   }
 });
 
-// Current User Profile & Assigned Branch
+// 2. Fast 4-Digit Quick Staff PIN Login (For Cashiers, Bakers & Tablet Unlocks)
+authRouter.post('/pin-login', async (req: Request, res: Response) => {
+  try {
+    const { phone, pin } = req.body;
+    const phoneTrim = phone?.trim();
+    const pinTrim = pin?.toString().trim();
+
+    if (!phoneTrim || !pinTrim) {
+      return res.status(400).json({ error: 'Phone number and 4-digit PIN are required.' });
+    }
+
+    if (!/^\d{4}$/.test(pinTrim)) {
+      return res.status(400).json({ error: 'Staff quick PIN must be exactly 4 digits.' });
+    }
+
+    const clean = normalizePhone(phoneTrim);
+
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [{ phone: phoneTrim }, { phone: clean }],
+      },
+      include: {
+        branch: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            isHub: true,
+            address: true,
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid phone number or PIN.' });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({ error: 'Your account has been deactivated. Contact an administrator.' });
+    }
+
+    if (user.role !== Role.OWNER && user.role !== Role.ADMIN && user.branch && !user.branch.isActive) {
+      return res.status(403).json({ error: 'Login denied: Your assigned branch is currently inactive.' });
+    }
+
+    if (!user.pinHash) {
+      return res.status(400).json({
+        error: 'Quick PIN is not set for this account. Please log in using your password and configure your PIN in profile.',
+      });
+    }
+
+    const isPinValid = await bcrypt.compare(pinTrim, user.pinHash);
+    if (!isPinValid) {
+      return res.status(401).json({ error: 'Invalid phone number or PIN.' });
+    }
+
+    const token = signToken({
+      id: user.id,
+      fullName: user.fullName,
+      phone: user.phone,
+      role: user.role,
+      branchId: user.branchId,
+    });
+
+    const userDto = formatUserDto(user);
+
+    return res.json({
+      token,
+      user: userDto,
+      ...userDto,
+    });
+  } catch (err: any) {
+    console.error('PIN Login error:', err);
+    return res.status(500).json({ error: 'PIN login failed due to a server error.' });
+  }
+});
+
+// 3. Verify 6-Digit Manager Approval Code (For Sensitive Overrides & Damaged Shipments)
+authRouter.post('/verify-supervisor-pin', async (req: Request, res: Response) => {
+  try {
+    const { supervisorPhone, supervisorId, pin } = req.body;
+    const pinTrim = pin?.toString().trim();
+
+    if (!pinTrim || !/^\d{6}$/.test(pinTrim)) {
+      return res.status(400).json({ error: 'Supervisor approval code must be exactly 6 digits.' });
+    }
+
+    const where: any = {
+      role: { in: [Role.OWNER, Role.ADMIN, Role.BRANCH_MANAGER] },
+      isActive: true,
+    };
+
+    if (supervisorId) {
+      where.id = supervisorId;
+    } else if (supervisorPhone) {
+      const clean = normalizePhone(supervisorPhone.trim());
+      where.OR = [{ phone: supervisorPhone.trim() }, { phone: clean }];
+    } else {
+      return res.status(400).json({ error: 'Supervisor ID or phone number is required.' });
+    }
+
+    const supervisor = await prisma.user.findFirst({
+      where,
+      select: {
+        id: true,
+        fullName: true,
+        role: true,
+        branchId: true,
+        managerApprovalPinHash: true,
+      },
+    });
+
+    if (!supervisor || !supervisor.managerApprovalPinHash) {
+      return res.status(401).json({ error: 'Invalid supervisor code or supervisor not authorized.' });
+    }
+
+    const isValid = await bcrypt.compare(pinTrim, supervisor.managerApprovalPinHash);
+    if (!isValid) {
+      return res.status(401).json({ error: 'Invalid supervisor approval code.' });
+    }
+
+    return res.json({
+      verified: true,
+      supervisor: {
+        id: supervisor.id,
+        fullName: supervisor.fullName,
+        role: supervisor.role,
+        branchId: supervisor.branchId,
+      },
+    });
+  } catch (err: any) {
+    console.error('Verify supervisor PIN error:', err);
+    return res.status(500).json({ error: 'Verification failed.' });
+  }
+});
+
+// 4. Current User Profile & Assigned Branch
 authRouter.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const user = await prisma.user.findUnique({
@@ -149,7 +288,84 @@ authRouter.get('/me', authMiddleware, async (req: AuthRequest, res: Response) =>
   }
 });
 
-// Public employee request for password reset
+// 5. Set or Update 4-Digit Quick PIN (Self-Service)
+authRouter.patch('/pin', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { pin, password } = req.body;
+    const pinTrim = pin?.toString().trim();
+
+    if (!pinTrim || !/^\d{4}$/.test(pinTrim)) {
+      return res.status(400).json({ error: 'Staff quick PIN must be exactly 4 digits.' });
+    }
+
+    if (!password) {
+      return res.status(400).json({ error: 'Current account password is required to configure quick PIN.' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Incorrect account password.' });
+    }
+
+    const pinHash = await bcrypt.hash(pinTrim, 10);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { pinHash },
+    });
+
+    return res.json({ message: '4-digit quick PIN updated successfully.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: 'Failed to update quick PIN.' });
+  }
+});
+
+// 6. Set or Update 6-Digit Manager Approval Code (Supervisor Only)
+authRouter.patch(
+  '/supervisor-pin',
+  authMiddleware,
+  requireRoles(Role.OWNER, Role.ADMIN, Role.BRANCH_MANAGER),
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const { approvalPin, password } = req.body;
+      const pinTrim = approvalPin?.toString().trim();
+
+      if (!pinTrim || !/^\d{6}$/.test(pinTrim)) {
+        return res.status(400).json({ error: 'Manager approval code must be exactly 6 digits.' });
+      }
+
+      if (!password) {
+        return res.status(400).json({ error: 'Current account password is required to configure approval code.' });
+      }
+
+      const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
+      if (!user) {
+        return res.status(404).json({ error: 'User not found.' });
+      }
+
+      const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+      if (!isPasswordValid) {
+        return res.status(401).json({ error: 'Incorrect account password.' });
+      }
+
+      const managerApprovalPinHash = await bcrypt.hash(pinTrim, 10);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { managerApprovalPinHash },
+      });
+
+      return res.json({ message: '6-digit supervisor approval code updated successfully.' });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to update supervisor code.' });
+    }
+  }
+);
+
+// 7. Public employee request for password reset
 authRouter.post('/forgot-password', async (req: Request, res: Response) => {
   try {
     const { phone } = req.body;
@@ -168,7 +384,6 @@ authRouter.post('/forgot-password', async (req: Request, res: Response) => {
     });
 
     if (!user) {
-      // Avoid enumeration; return generic confirmation
       return res.json({
         message: 'Password reset request submitted. If your account exists and is active, your Manager or Administrator can assist you with a new password.',
       });
@@ -200,7 +415,7 @@ authRouter.post('/forgot-password', async (req: Request, res: Response) => {
   }
 });
 
-// Protected: List password reset requests (OWNER & ADMIN)
+// 8. Protected: List password reset requests (OWNER & ADMIN)
 authRouter.get(
   '/password-reset-requests',
   authMiddleware,
@@ -228,7 +443,7 @@ authRouter.get(
   }
 );
 
-// Protected: Admin reset employee password
+// 9. Protected: Admin reset employee password
 authRouter.post(
   '/admin-reset-password',
   authMiddleware,
@@ -270,7 +485,7 @@ authRouter.post(
   }
 );
 
-// Change Password
+// 10. Change Password
 authRouter.patch('/password', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -305,7 +520,7 @@ authRouter.patch('/password', authMiddleware, async (req: AuthRequest, res: Resp
   }
 });
 
-// Logout
+// 11. Logout
 authRouter.post('/logout', authMiddleware, (_req: AuthRequest, res: Response) => {
   return res.json({ message: 'Logged out successfully.' });
 });

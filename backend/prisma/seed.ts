@@ -45,8 +45,10 @@ async function main() {
   }
   console.log(`✅ 5 Branches seeded: 1 Central Hub + 4 Retail Spokes`);
 
-  // 3. Password hash
+  // 3. Password & PIN hashes
   const defaultPasswordHash = await bcrypt.hash('password123', 10);
+  const defaultPinHash = await bcrypt.hash('1234', 10); // 4-digit quick staff PIN
+  const defaultManagerApprovalPinHash = await bcrypt.hash('123456', 10); // 6-digit supervisor code
 
   // 4. Staff Users (Standard phone + password login)
   const staffData = [
@@ -153,6 +155,8 @@ async function main() {
 
   for (const s of staffData) {
     const branchId = s.branchCode ? branchMap.get(s.branchCode) || null : null;
+    const isSupervisor = s.role === Role.OWNER || s.role === Role.ADMIN || s.role === Role.BRANCH_MANAGER;
+
     await prisma.user.upsert({
       where: { phone: s.phone },
       update: {
@@ -161,11 +165,15 @@ async function main() {
         branchId,
         salary: s.salary,
         shift: s.shift,
+        pinHash: defaultPinHash,
+        managerApprovalPinHash: isSupervisor ? defaultManagerApprovalPinHash : null,
       },
       create: {
         fullName: s.fullName,
         phone: s.phone,
         passwordHash: defaultPasswordHash,
+        pinHash: defaultPinHash,
+        managerApprovalPinHash: isSupervisor ? defaultManagerApprovalPinHash : null,
         role: s.role,
         branchId,
         salary: s.salary,
@@ -173,7 +181,7 @@ async function main() {
       },
     });
   }
-  console.log(`✅ 11 Staff Users seeded with standard phone/password auth`);
+  console.log(`✅ Staff Users seeded with Password + 4-digit PIN ('1234') + 6-digit Supervisor code ('123456')`);
 
   // 5. Product Categories & Bread Catalog
   const category = await prisma.productCategory.upsert({
@@ -220,7 +228,93 @@ async function main() {
     }
   }
   console.log(`✅ Initial Bread Catalog & Starter Shelf Stock seeded across all 5 branches`);
-  console.log('🎉 Foundation Seeding Complete!');
+
+  // 6. Developer 1: Raw Materials & Central Hub Warehouse Inventory
+  const boleHubId = branchMap.get('BOLE-HUB');
+  if (boleHubId) {
+    const rawMaterialsData = [
+      {
+        name: 'Wheat Flour (50kg Bag)',
+        sku: 'MAT-FLOUR-50KG',
+        unit: 'BAG',
+        packageWeightKg: 50.0,
+        minStockThreshold: 20,
+        costPerUnit: 3500.0,
+        initialStock: 100, // 100 sacks = 5,000 kg
+      },
+      {
+        name: 'Dry Baker Yeast',
+        sku: 'MAT-YEAST-KG',
+        unit: 'KG',
+        packageWeightKg: 1.0,
+        minStockThreshold: 10,
+        costPerUnit: 450.0,
+        initialStock: 50,
+      },
+      {
+        name: 'Refined White Sugar',
+        sku: 'MAT-SUGAR-KG',
+        unit: 'KG',
+        packageWeightKg: 1.0,
+        minStockThreshold: 15,
+        costPerUnit: 120.0,
+        initialStock: 100,
+      },
+      {
+        name: 'Iodized Table Salt',
+        sku: 'MAT-SALT-KG',
+        unit: 'KG',
+        packageWeightKg: 1.0,
+        minStockThreshold: 10,
+        costPerUnit: 40.0,
+        initialStock: 50,
+      },
+      {
+        name: 'Vegetable Cooking Oil',
+        sku: 'MAT-OIL-L',
+        unit: 'LITER',
+        packageWeightKg: 1.0,
+        minStockThreshold: 20,
+        costPerUnit: 320.0,
+        initialStock: 60,
+      },
+    ];
+
+    for (const rm of rawMaterialsData) {
+      const material = await prisma.rawMaterial.upsert({
+        where: { sku: rm.sku },
+        update: {
+          name: rm.name,
+          unit: rm.unit,
+          packageWeightKg: rm.packageWeightKg,
+          minStockThreshold: rm.minStockThreshold,
+          costPerUnit: rm.costPerUnit,
+        },
+        create: {
+          name: rm.name,
+          sku: rm.sku,
+          unit: rm.unit,
+          packageWeightKg: rm.packageWeightKg,
+          minStockThreshold: rm.minStockThreshold,
+          costPerUnit: rm.costPerUnit,
+        },
+      });
+
+      // Stock Bole Central Hub Warehouse
+      await prisma.rawMaterialStock.upsert({
+        where: { branchId_rawMaterialId: { branchId: boleHubId, rawMaterialId: material.id } },
+        update: { quantity: rm.initialStock },
+        create: {
+          branchId: boleHubId,
+          rawMaterialId: material.id,
+          quantity: rm.initialStock,
+        },
+      });
+    }
+    console.log(`✅ Bole Central Hub Warehouse stocked with 5 Raw Materials (including 100 flour sacks)`);
+  }
+
+  console.log('🎉 Foundation & Dev 1 Seeding Complete!');
 }
 
 main()
