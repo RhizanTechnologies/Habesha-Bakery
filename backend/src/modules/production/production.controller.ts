@@ -208,6 +208,27 @@ productionRouter.post(
         },
       });
 
+      // Developer 1: Credit baked loaves directly to Central Hub / Branch Shelf Stock
+      if (targetProductId && targetBranchId) {
+        const netBaked = Math.max(0, baked - damaged);
+        await prisma.branchProductStock.upsert({
+          where: {
+            branchId_productId: {
+              branchId: targetBranchId,
+              productId: targetProductId,
+            },
+          },
+          update: {
+            availableStock: { increment: netBaked },
+          },
+          create: {
+            branchId: targetBranchId,
+            productId: targetProductId,
+            availableStock: netBaked,
+          },
+        });
+      }
+
       return res.status(201).json({
         message: isUnderYield
           ? `Batch logged with low yield warning (${yieldEfficiency}% of expected ${expectedLoaves} loaves). Flagged for supervisor review.`

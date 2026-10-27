@@ -7,6 +7,7 @@ import { usersRouter } from './modules/users/users.controller.js';
 import { companyRouter } from './modules/company/company.controller.js';
 import { inventoryRouter } from './modules/inventory/inventory.controller.js';
 import { productionRouter } from './modules/production/production.controller.js';
+import { transfersRouter } from './modules/transfers/transfers.controller.js';
 
 export const app = express();
 
@@ -33,6 +34,7 @@ app.use('/api/branches', branchesRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/inventory', inventoryRouter);
 app.use('/api/production', productionRouter);
+app.use('/api/transfers', transfersRouter);
 
 // 404 handler
 app.use((_req, res) => {
