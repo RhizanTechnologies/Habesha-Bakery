@@ -52,8 +52,16 @@ async function main() {
   const staffData = [
     // Global Owner (HQ / All Branches)
     {
-      fullName: 'Hamza Owner',
+      fullName: 'Mame Owner',
       phone: '0911000000',
+      role: Role.OWNER,
+      branchCode: null,
+      salary: 50000,
+      shift: null,
+    },
+    {
+      fullName: 'Habesha Executive Owner',
+      phone: '0912345678',
       role: Role.OWNER,
       branchCode: null,
       salary: 50000,
