@@ -1,0 +1,133 @@
+// Habesha Bakery ERP - Foundation Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  BRANCH_MANAGER
+  CASHIER
+  STOREKEEPER
+  PRODUCTION_SUPERVISOR
+  BAKER
+  DRIVER
+}
+
+enum Shift {
+  DAY
+  NIGHT
+}
+
+enum PaymentMethod {
+  CASH
+  CBE
+  TELEBIRR
+  MOBILE_BANKING
+  CREDIT
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  email     String?
+  phone     String?
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  branches  Branch[]
+}
+
+model Branch {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name        String
+  code        String   @unique // "BOLE-HUB", "MEG", "PIA", "SAR", "CMC"
+  isHub       Boolean  @default(false)
+  address     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users         User[]
+  productStocks BranchProductStock[]
+
+  @@index([companyId])
+}
+
+model User {
+  id           String    @id @default(cuid())
+  fullName     String
+  phone        String    @unique // Phone used as login username
+  passwordHash String
+  role         Role
+  branchId     String?
+  branch       Branch?   @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  isActive     Boolean   @default(true)
+  salary       Decimal?  @db.Decimal(12, 2)
+  shift        Shift?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([branchId])
+  @@index([role])
+}
+
+model ProductCategory {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  products    Product[]
+}
+
+model Product {
+  id           String             @id @default(cuid())
+  categoryId   String
+  category     ProductCategory    @relation(fields: [categoryId], references: [id])
+  name         String
+  sku          String             @unique
+  sellingPrice Decimal            @db.Decimal(10, 2)
+  costPrice    Decimal?           @db.Decimal(10, 2)
+  unit         String             @default("PIECE")
+  isActive     Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  branchStocks BranchProductStock[]
+
+  @@index([categoryId])
+}
+
+model BranchProductStock {
+  id             String   @id @default(cuid())
+  branchId       String
+  branch         Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  productId      String
+  product        Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  availableStock Int      @default(0)
+  updatedAt      DateTime @updatedAt
+
+  @@unique([branchId, productId])
+  @@index([branchId])
+  @@index([productId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  branchId  String?
+  action    String
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([branchId])
+}
