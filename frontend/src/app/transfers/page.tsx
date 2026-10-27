@@ -20,7 +20,6 @@ import {
   UserCheck,
   FileText,
   BadgeAlert,
-  ChevronRight,
 } from 'lucide-react';
 
 interface TransferManifest {
@@ -243,175 +242,160 @@ export default function TransfersPage() {
   });
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      {/* Top Banner */}
-      <div className="bg-gradient-to-r from-amber-700 via-amber-800 to-[#4A2E1B] rounded-2xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
-        <div className="absolute right-0 top-0 bottom-0 opacity-10 pointer-events-none flex items-center pr-12">
-          <Truck className="w-72 h-72" />
+    <div className="space-y-6">
+      {/* ── Header Title & Actions ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-black text-[#2C1B10]">Crate Logistics &amp; Transfers</h1>
+            <span className="px-2.5 py-0.5 rounded-full bg-[#E87A18]/10 text-[#E87A18] text-[11px] font-black uppercase tracking-wider">
+              Developer 1
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm text-[#8C7361] mt-1 font-medium">
+            40 loaves per crate packaging physics, driver departure sign-offs, and spoke arrival receiving with driver damage accountability.
+          </p>
         </div>
 
-        <div className="relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/30 border border-amber-400/40 text-amber-200 text-xs font-bold tracking-wide mb-3">
-            <Layers className="w-3.5 h-3.5" />
-            DEVELOPER 1 &bull; LOGISTICS &amp; CRATE ENGINE
-          </div>
-
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-                Hub-to-Spoke Crate Transfers
-              </h1>
-              <p className="text-amber-100/90 text-sm mt-1 max-w-2xl">
-                Physics-based crate calculation (40 loaves/crate), driver sign-off handshake, and spoke arrival receiving with driver damage accountability.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                onClick={fetchTransfers}
-                disabled={loading}
-                className="p-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors flex items-center justify-center"
-                title="Refresh"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-              </button>
-
-              <button
-                onClick={() => setIsCreateOpen(true)}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-black shadow-md hover:shadow-lg transition-all transform hover:-translate-y-0.5"
-              >
-                <PlusCircle className="w-4 h-4" />
-                Dispatch New Crates
-              </button>
-            </div>
-          </div>
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            onClick={fetchTransfers}
+            disabled={loading}
+            className="p-2.5 rounded-2xl border border-[#EDE4D5] bg-[#FFFDF8] hover:bg-[#FAF7EE] text-[#4A2E1B] transition-colors cursor-pointer"
+            title="Refresh Transfers"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={() => setIsCreateOpen(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#E87A18] hover:bg-[#D96B10] text-white text-xs font-bold shadow-xs hover:shadow-md transition-all cursor-pointer"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Dispatch New Crates</span>
+          </button>
         </div>
       </div>
 
-      {/* Alerts */}
+      {/* ── Status Alerts ── */}
       {actionSuccess && (
-        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-medium flex items-center justify-between">
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs font-semibold text-emerald-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{actionSuccess}</span>
           </div>
-          <button onClick={() => setActionSuccess(null)} className="text-emerald-700 hover:text-emerald-900">
+          <button onClick={() => setActionSuccess(null)} className="text-emerald-700 hover:text-emerald-900 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {actionError && (
-        <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-sm font-medium flex items-center justify-between">
+        <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-xs font-semibold text-rose-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>{actionError}</span>
           </div>
-          <button onClick={() => setActionError(null)} className="text-rose-700 hover:text-rose-900">
+          <button onClick={() => setActionError(null)} className="text-rose-700 hover:text-rose-900 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* KPI Cards */}
+      {/* ── KPI Metric Cards ── */}
       {metrics && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider">In Transit</span>
-              <Truck className="w-4 h-4 text-sky-600" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="border border-[#EDE4D5] bg-[#FFFDF8] rounded-3xl p-4 sm:p-5 shadow-2xs">
+            <div className="flex items-center justify-between text-[#8C7361] mb-2">
+              <span className="text-[11px] font-black uppercase tracking-wider">In Transit</span>
+              <Truck className="w-4 h-4 text-[#E87A18]" />
             </div>
-            <div className="text-2xl font-black text-slate-900">{metrics.inTransitCount} Vans</div>
-            <div className="text-xs text-sky-700 font-semibold mt-1">
+            <div className="text-xl sm:text-2xl font-black text-[#2C1B10]">{metrics.inTransitCount} Vans</div>
+            <div className="text-[11px] text-[#8C7361] font-semibold mt-1">
               {metrics.pendingCount} pending departure
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider">Crates Moved</span>
-              <Package className="w-4 h-4 text-amber-600" />
+          <div className="border border-[#EDE4D5] bg-[#FFFDF8] rounded-3xl p-4 sm:p-5 shadow-2xs">
+            <div className="flex items-center justify-between text-[#8C7361] mb-2">
+              <span className="text-[11px] font-black uppercase tracking-wider">Crates Moved</span>
+              <Package className="w-4 h-4 text-[#E87A18]" />
             </div>
-            <div className="text-2xl font-black text-slate-900">{metrics.totalCratesMoved} Crates</div>
-            <div className="text-xs text-amber-700 font-semibold mt-1">
+            <div className="text-xl sm:text-2xl font-black text-[#2C1B10]">{metrics.totalCratesMoved} Crates</div>
+            <div className="text-[11px] text-[#8C7361] font-semibold mt-1">
               {metrics.totalDispatchedLoaves.toLocaleString()} Total Loaves
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider">Delivered &amp; Stocked</span>
+          <div className="border border-[#EDE4D5] bg-[#FFFDF8] rounded-3xl p-4 sm:p-5 shadow-2xs">
+            <div className="flex items-center justify-between text-[#8C7361] mb-2">
+              <span className="text-[11px] font-black uppercase tracking-wider">Delivered &amp; Stocked</span>
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             </div>
-            <div className="text-2xl font-black text-emerald-700">{metrics.receivedCount} Manifests</div>
-            <div className="text-xs text-slate-500 font-semibold mt-1">
+            <div className="text-xl sm:text-2xl font-black text-emerald-700">{metrics.receivedCount} Manifests</div>
+            <div className="text-[11px] text-[#8C7361] font-semibold mt-1">
               +{metrics.totalReceivedLoaves.toLocaleString()} Added to Shelf Stock
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm">
-            <div className="flex items-center justify-between text-slate-500 mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider">Driver Accountability</span>
+          <div className="border border-[#EDE4D5] bg-[#FFFDF8] rounded-3xl p-4 sm:p-5 shadow-2xs">
+            <div className="flex items-center justify-between text-[#8C7361] mb-2">
+              <span className="text-[11px] font-black uppercase tracking-wider">Driver Penalty</span>
               <BadgeAlert className="w-4 h-4 text-rose-600" />
             </div>
-            <div className="text-2xl font-black text-rose-700">ETB {metrics.totalDriverBilledCost.toFixed(2)}</div>
-            <div className="text-xs text-rose-600 font-semibold mt-1">
-              {metrics.totalCrushedLoaves} Crushed loaves billed
+            <div className="text-xl sm:text-2xl font-black text-rose-700">ETB {metrics.totalDriverBilledCost.toFixed(2)}</div>
+            <div className="text-[11px] text-rose-600 font-semibold mt-1">
+              {metrics.totalCrushedLoaves} crushed loaves billed
             </div>
           </div>
         </div>
       )}
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
-        {(['ALL', 'PENDING', 'IN_TRANSIT', 'RECEIVED'] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-              activeTab === tab
-                ? 'bg-amber-800 text-white shadow-sm'
-                : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
-            }`}
-          >
-            {tab === 'ALL' && 'All Transfers'}
-            {tab === 'PENDING' && 'Pending Dispatch'}
-            {tab === 'IN_TRANSIT' && 'In Transit (On Road)'}
-            {tab === 'RECEIVED' && 'Delivered & Received'}
-          </button>
-        ))}
-      </div>
-
-      {/* Manifests Table */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+      {/* ── Main Manifest Card & Tabs ── */}
+      <div className="border border-[#EDE4D5] bg-[#FFFDF8] rounded-3xl shadow-2xs overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-[#EDE4D5] flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#FAF7EE]/50">
           <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-amber-700" />
-            <h2 className="text-sm font-bold text-slate-900">Inter-Branch Transfer Manifests</h2>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold">
-              {filteredManifests.length} total
+            <Layers className="w-4 h-4 text-[#4A2E1B]" />
+            <h2 className="text-sm font-black text-[#2C1B10]">Inter-Branch Transfer Manifests</h2>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#EDE4D5] text-[#4A2E1B] font-bold">
+              {filteredManifests.length}
             </span>
           </div>
-          <span className="text-xs text-slate-500 hidden sm:inline">
-            Physics Standard: 40 loaves / crate &bull; Automatic +Shelf Stock on Spoke Arrival
-          </span>
+
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+            {(['ALL', 'PENDING', 'IN_TRANSIT', 'RECEIVED'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                  activeTab === tab
+                    ? 'bg-[#4A2E1B] text-white shadow-xs'
+                    : 'bg-[#FFFDF8] text-[#8C7361] hover:text-[#4A2E1B] border border-[#EDE4D5]'
+                }`}
+              >
+                {tab === 'ALL' && 'All'}
+                {tab === 'PENDING' && 'Pending'}
+                {tab === 'IN_TRANSIT' && 'In Transit'}
+                {tab === 'RECEIVED' && 'Delivered'}
+              </button>
+            ))}
+          </div>
         </div>
 
         {loading ? (
-          <div className="p-12 text-center text-slate-500 flex flex-col items-center justify-center gap-3">
-            <Loader2 className="w-6 h-6 animate-spin text-amber-600" />
-            <span className="text-sm font-semibold">Loading transfer manifests...</span>
+          <div className="p-12 text-center text-[#8C7361] flex flex-col items-center justify-center gap-2">
+            <Loader2 className="w-6 h-6 animate-spin text-[#E87A18]" />
+            <span className="text-xs font-bold">Loading transfer manifests...</span>
           </div>
         ) : filteredManifests.length === 0 ? (
-          <div className="p-12 text-center text-slate-400">
-            <Truck className="w-12 h-12 mx-auto mb-2 opacity-30 text-slate-600" />
-            <p className="text-sm font-bold text-slate-600">No transfer manifests found in this category.</p>
-            <p className="text-xs text-slate-400 mt-1">Create a new crate transfer from the Central Hub to begin.</p>
+          <div className="p-12 text-center text-[#8C7361]">
+            <Truck className="w-10 h-10 mx-auto mb-2 opacity-30 text-[#4A2E1B]" />
+            <p className="text-xs font-bold text-[#4A2E1B]">No manifests found in this category.</p>
+            <p className="text-[11px] text-[#8C7361] mt-0.5">Click &quot;Dispatch New Crates&quot; to send bread from Central Hub.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-[#FAF7EE] text-slate-700 text-xs uppercase font-black border-b border-slate-200/80 tracking-wider">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#FAF7EE] text-[#8C7361] uppercase font-black text-[10px] tracking-wider border-b border-[#EDE4D5]">
                 <tr>
                   <th className="py-3 px-4">Manifest #</th>
                   <th className="py-3 px-4">Route</th>
@@ -422,63 +406,63 @@ export default function TransfersPage() {
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-800 font-medium">
+              <tbody className="divide-y divide-[#EDE4D5]/60 text-[#2C1B10] font-medium">
                 {filteredManifests.map((manifest) => (
-                  <tr key={manifest.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-900 text-xs">
+                  <tr key={manifest.id} className="hover:bg-[#FAF7EE]/50 transition-colors">
+                    <td className="py-3.5 px-4 font-mono font-bold text-[#2C1B10]">
                       {manifest.manifestNumber}
-                      <div className="text-[10px] text-slate-400 font-normal">
+                      <div className="text-[10px] text-[#8C7361] font-normal">
                         {new Date(manifest.createdAt).toLocaleDateString()} &bull; {new Date(manifest.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </td>
 
                     <td className="py-3.5 px-4">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
-                        <span className="text-amber-800">{manifest.sourceBranch.name}</span>
-                        <ArrowRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="text-slate-900">{manifest.destinationBranch.name}</span>
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <span className="text-[#E87A18]">{manifest.sourceBranch.name}</span>
+                        <ArrowRight className="w-3.5 h-3.5 text-[#8C7361] shrink-0" />
+                        <span className="text-[#2C1B10]">{manifest.destinationBranch.name}</span>
                       </div>
-                      <div className="text-[11px] text-slate-500 mt-0.5 font-normal">
+                      <div className="text-[11px] text-[#8C7361] mt-0.5">
                         {manifest.product.name}
                       </div>
                     </td>
 
                     <td className="py-3.5 px-4">
-                      <div className="font-bold text-slate-900 text-sm">
+                      <div className="font-bold text-[#2C1B10]">
                         {manifest.dispatchedLoaves.toLocaleString()} Loaves
                       </div>
-                      <div className="text-xs text-amber-800 font-bold flex items-center gap-1 mt-0.5">
-                        <Package className="w-3.5 h-3.5" />
+                      <div className="text-[11px] text-[#E87A18] font-bold flex items-center gap-1 mt-0.5">
+                        <Package className="w-3 h-3" />
                         {manifest.crateCount} Crates (40/crate)
                       </div>
                     </td>
 
                     <td className="py-3.5 px-4">
-                      <div className="font-bold text-slate-900 text-xs">
+                      <div className="font-bold text-[#2C1B10]">
                         {manifest.driver.fullName}
                       </div>
-                      <div className="text-[11px] text-slate-500">
+                      <div className="text-[11px] text-[#8C7361]">
                         {manifest.driver.phone}
                       </div>
                     </td>
 
                     <td className="py-3.5 px-4">
                       {manifest.status === 'PENDING_DISPATCH' && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-200">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
                           <Clock className="w-3 h-3" />
                           Pending Dispatch
                         </span>
                       )}
                       {manifest.status === 'IN_TRANSIT' && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-sky-100 text-sky-900 border border-sky-200 animate-pulse">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-sky-50 text-sky-800 border border-sky-200 animate-pulse">
                           <Truck className="w-3 h-3" />
-                          In Transit (Van on Road)
+                          In Transit
                         </span>
                       )}
                       {manifest.status === 'RECEIVED' && (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-200">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
                           <CheckCircle2 className="w-3 h-3" />
-                          Received &amp; Stocked
+                          Stocked
                         </span>
                       )}
                     </td>
@@ -486,7 +470,7 @@ export default function TransfersPage() {
                     <td className="py-3.5 px-4">
                       {manifest.status === 'RECEIVED' ? (
                         manifest.crushedLoaves && manifest.crushedLoaves > 0 ? (
-                          <div className="text-xs">
+                          <div>
                             <span className="text-rose-700 font-bold">
                               {manifest.crushedLoaves} Crushed
                             </span>
@@ -495,12 +479,12 @@ export default function TransfersPage() {
                             </div>
                           </div>
                         ) : (
-                          <span className="text-xs font-bold text-emerald-700 flex items-center gap-1">
+                          <span className="font-bold text-emerald-700 flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" /> 0 Damages
                           </span>
                         )
                       ) : (
-                        <span className="text-xs text-slate-400">&mdash;</span>
+                        <span className="text-[#8C7361]">&mdash;</span>
                       )}
                     </td>
 
@@ -509,7 +493,7 @@ export default function TransfersPage() {
                         <button
                           onClick={() => handleDispatchHandshake(manifest.id)}
                           disabled={submitting}
-                          className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1 ml-auto"
+                          className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold transition-all shadow-xs flex items-center gap-1 ml-auto cursor-pointer"
                         >
                           <Truck className="w-3.5 h-3.5" />
                           Driver Sign &amp; Dispatch
@@ -524,7 +508,7 @@ export default function TransfersPage() {
                             setSupervisorPin('');
                           }}
                           disabled={submitting}
-                          className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1 ml-auto"
+                          className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold transition-all shadow-xs flex items-center gap-1 ml-auto cursor-pointer"
                         >
                           <ShieldCheck className="w-3.5 h-3.5" />
                           Spoke Arrival Handshake
@@ -532,10 +516,10 @@ export default function TransfersPage() {
                       )}
 
                       {manifest.status === 'RECEIVED' && (
-                        <div className="text-[11px] text-slate-500 text-right">
+                        <div className="text-right">
                           <span className="text-emerald-700 font-bold">+{manifest.receivedLoaves} Loaves Stocked</span>
                           {manifest.receivedByUser && (
-                            <div className="text-[10px] text-slate-400">
+                            <div className="text-[10px] text-[#8C7361]">
                               by {manifest.receivedByUser.fullName}
                             </div>
                           )}
@@ -550,31 +534,30 @@ export default function TransfersPage() {
         )}
       </div>
 
-      {/* MODAL 1: Create Transfer Manifest */}
+      {/* ── Modal 1: Create Transfer Manifest ── */}
       {isCreateOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[#FFFDF8] rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-[#EDE4D5] max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-[#EDE4D5]">
               <div className="flex items-center gap-2">
-                <Truck className="w-5 h-5 text-amber-700" />
-                <h3 className="text-lg font-black text-slate-900">Dispatch Inter-Branch Crate Transfer</h3>
+                <Truck className="w-5 h-5 text-[#E87A18]" />
+                <h3 className="text-base font-extrabold text-[#2C1B10]">Dispatch Crate Transfer</h3>
               </div>
-              <button onClick={() => setIsCreateOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setIsCreateOpen(false)} className="text-[#8C7361] hover:text-[#4A2E1B] p-1 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleCreateManifest} className="mt-4 space-y-4">
-              {/* Destination Branch */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                <label className="block text-[11px] font-black uppercase tracking-wider text-[#8C7361] mb-1">
                   Destination Retail Spoke Branch *
                 </label>
                 <select
                   value={destBranchId}
                   onChange={(e) => setDestBranchId(e.target.value)}
                   required
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-900 text-sm font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-white border border-[#EDE4D5] rounded-xl text-xs font-bold text-[#2C1B10] focus:ring-2 focus:ring-[#E87A18] focus:outline-none"
                 >
                   {branches
                     .filter((b) => !b.isHub)
@@ -586,9 +569,8 @@ export default function TransfersPage() {
                 </select>
               </div>
 
-              {/* Loaves Input & Crate Physics Calculator */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                <label className="block text-[11px] font-black uppercase tracking-wider text-[#8C7361] mb-1">
                   Dispatched Loaves (50g Bread) *
                 </label>
                 <input
@@ -598,32 +580,30 @@ export default function TransfersPage() {
                   value={dispatchedLoaves}
                   onChange={(e) => setDispatchedLoaves(e.target.value)}
                   required
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-900 text-sm font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-[#FAF7EE]/60 border border-[#EDE4D5] rounded-xl text-xs font-bold text-[#2C1B10] font-mono focus:ring-2 focus:ring-[#E87A18] focus:outline-none"
                   placeholder="e.g. 5448"
                 />
 
-                {/* Physics Crate Calculation Preview */}
-                <div className="mt-2.5 p-3 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-between text-xs">
+                <div className="mt-2.5 p-3 rounded-2xl bg-[#FAF7EE] border border-[#EDE4D5] flex items-center justify-between text-xs">
                   <div>
-                    <span className="font-bold text-amber-950">Packaging Physics (40 loaves / crate):</span>
-                    <div className="text-amber-800 mt-0.5">
-                      {loavesNum.toLocaleString()} Loaves &divide; 40 = <strong className="text-amber-950 font-black">{cratePreview} Crates</strong>
+                    <span className="font-bold text-[#4A2E1B]">Physics Standard (40 loaves / crate):</span>
+                    <div className="text-[#8C7361] mt-0.5">
+                      {loavesNum.toLocaleString()} Loaves &divide; 40 = <strong className="text-[#2C1B10] font-black">{cratePreview} Crates</strong>
                     </div>
                   </div>
-                  <Package className="w-8 h-8 text-amber-600 opacity-60" />
+                  <Package className="w-7 h-7 text-[#E87A18] opacity-70" />
                 </div>
               </div>
 
-              {/* Assigned Driver */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                <label className="block text-[11px] font-black uppercase tracking-wider text-[#8C7361] mb-1">
                   Assigned Logistics Van Driver *
                 </label>
                 <select
                   value={driverId}
                   onChange={(e) => setDriverId(e.target.value)}
                   required
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-900 text-sm font-semibold focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-white border border-[#EDE4D5] rounded-xl text-xs font-bold text-[#2C1B10] focus:ring-2 focus:ring-[#E87A18] focus:outline-none"
                 >
                   {drivers.map((d) => (
                     <option key={d.id} value={d.id}>
@@ -633,35 +613,34 @@ export default function TransfersPage() {
                 </select>
               </div>
 
-              {/* Manifest Notes */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Manifest Notes &amp; Vehicle Departure Instructions
+                <label className="block text-[11px] font-black uppercase tracking-wider text-[#8C7361] mb-1">
+                  Departure Notes
                 </label>
                 <textarea
                   rows={2}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-900 text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
-                  placeholder="e.g. Morning rush delivery via Van #2, fragile top crates"
+                  className="w-full px-3.5 py-2.5 bg-[#FAF7EE]/60 border border-[#EDE4D5] rounded-xl text-xs text-[#2C1B10] focus:ring-2 focus:ring-[#E87A18] focus:outline-none"
+                  placeholder="e.g. Morning rush delivery via Van #2"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#EDE4D5]">
                 <button
                   type="button"
                   onClick={() => setIsCreateOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-sm font-bold hover:bg-slate-50 transition-colors"
+                  className="flex-1 py-2.5 border border-[#EDE4D5] bg-white text-[#4A2E1B] font-bold rounded-xl text-xs cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting || loavesNum <= 0}
-                  className="px-5 py-2 rounded-xl bg-amber-700 hover:bg-amber-600 text-white text-sm font-bold shadow-md transition-all flex items-center gap-2"
+                  className="flex-1 py-2.5 bg-[#E87A18] hover:bg-[#D96B10] text-white font-bold rounded-xl text-xs shadow-xs disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Confirm Manifest &amp; Pack {cratePreview} Crates
+                  {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Pack {cratePreview} Crates
                 </button>
               </div>
             </form>
@@ -669,47 +648,46 @@ export default function TransfersPage() {
         </div>
       )}
 
-      {/* MODAL 2: Spoke Arrival Handshake (Receiving & Crushed Billing) */}
+      {/* ── Modal 2: Spoke Arrival Handshake (Receive & Damage Billing) ── */}
       {selectedManifestForReceive && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[#FFFDF8] rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-[#EDE4D5] max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-[#EDE4D5]">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-emerald-700" />
-                <h3 className="text-lg font-black text-slate-900">Spoke Arrival Handshake</h3>
+                <h3 className="text-base font-extrabold text-[#2C1B10]">Spoke Arrival Handshake</h3>
               </div>
               <button
                 onClick={() => setSelectedManifestForReceive(null)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-[#8C7361] hover:text-[#4A2E1B] p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-xs space-y-1">
+            <div className="mt-3 p-3.5 rounded-2xl bg-[#FAF7EE] border border-[#EDE4D5] text-xs space-y-1">
               <div className="flex justify-between">
-                <span className="text-slate-500">Manifest:</span>
-                <span className="font-mono font-bold text-slate-900">{selectedManifestForReceive.manifestNumber}</span>
+                <span className="text-[#8C7361]">Manifest:</span>
+                <span className="font-mono font-bold text-[#2C1B10]">{selectedManifestForReceive.manifestNumber}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Destination:</span>
-                <span className="font-bold text-slate-900">{selectedManifestForReceive.destinationBranch.name}</span>
+                <span className="text-[#8C7361]">Destination:</span>
+                <span className="font-bold text-[#2C1B10]">{selectedManifestForReceive.destinationBranch.name}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Total Dispatched:</span>
-                <span className="font-bold text-slate-900">{selectedManifestForReceive.dispatchedLoaves} Loaves ({selectedManifestForReceive.crateCount} Crates)</span>
+                <span className="text-[#8C7361]">Total Dispatched:</span>
+                <span className="font-bold text-[#2C1B10]">{selectedManifestForReceive.dispatchedLoaves} Loaves ({selectedManifestForReceive.crateCount} Crates)</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Driver:</span>
-                <span className="font-bold text-slate-900">{selectedManifestForReceive.driver.fullName}</span>
+                <span className="text-[#8C7361]">Driver:</span>
+                <span className="font-bold text-[#2C1B10]">{selectedManifestForReceive.driver.fullName}</span>
               </div>
             </div>
 
             <form onSubmit={handleReceiveHandshake} className="mt-4 space-y-4">
-              {/* Crushed Loaves Input */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                  Crushed / Damaged Loaves (Inspection) *
+                <label className="block text-[11px] font-black uppercase tracking-wider text-[#8C7361] mb-1">
+                  Crushed / Damaged Loaves *
                 </label>
                 <input
                   type="number"
@@ -719,12 +697,11 @@ export default function TransfersPage() {
                   value={crushedLoaves}
                   onChange={(e) => setCrushedLoaves(e.target.value)}
                   required
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-900 text-sm font-semibold focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 bg-[#FAF7EE]/60 border border-[#EDE4D5] rounded-xl text-xs font-bold text-[#2C1B10] font-mono focus:ring-2 focus:ring-emerald-500 focus:outline-none"
                   placeholder="0 if all arrived intact"
                 />
               </div>
 
-              {/* Dynamic Live Damage & Stock Credit Preview */}
               {(() => {
                 const crushedNum = Math.max(0, parseInt(crushedLoaves, 10) || 0);
                 const intactNum = Math.max(0, selectedManifestForReceive.dispatchedLoaves - crushedNum);
@@ -732,22 +709,22 @@ export default function TransfersPage() {
                 const driverDamagePenalty = crushedNum * unitPrice;
 
                 return (
-                  <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs space-y-2">
+                  <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-xs space-y-2">
                     <div className="flex justify-between items-center text-emerald-950 font-bold">
                       <span>Loaves Adding to Shelf Stock:</span>
-                      <span className="text-base font-black text-emerald-700">+{intactNum} Loaves</span>
+                      <span className="text-sm font-black text-emerald-700">+{intactNum} Loaves</span>
                     </div>
 
                     {crushedNum > 0 && (
                       <div className="pt-2 border-t border-emerald-200/80 text-rose-900 space-y-1">
                         <div className="flex justify-between items-center font-bold">
-                          <span>Driver Damage Accountability:</span>
+                          <span>Driver Penalty Applied:</span>
                           <span className="text-sm font-black text-rose-700">
                             ETB {driverDamagePenalty.toFixed(2)}
                           </span>
                         </div>
                         <p className="text-[11px] text-rose-700">
-                          {crushedNum} crushed loaves &times; ETB {unitPrice.toFixed(2)} billed directly to driver {selectedManifestForReceive.driver.fullName}.
+                          {crushedNum} crushed loaves billed to driver {selectedManifestForReceive.driver.fullName}.
                         </p>
                       </div>
                     )}
@@ -755,9 +732,8 @@ export default function TransfersPage() {
                 );
               })()}
 
-              {/* Supervisor 6-Digit PIN (if damaged) */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                <label className="block text-[11px] font-black uppercase tracking-wider text-[#8C7361] mb-1">
                   Supervisor Approval Code (6-Digit PIN)
                 </label>
                 <input
@@ -765,43 +741,39 @@ export default function TransfersPage() {
                   maxLength={6}
                   value={supervisorPin}
                   onChange={(e) => setSupervisorPin(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-900 text-sm font-mono tracking-widest focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  placeholder="123456 (Required if reporting damages)"
+                  className="w-full px-3.5 py-2.5 bg-[#FAF7EE]/60 border border-[#EDE4D5] rounded-xl text-xs font-mono tracking-widest text-[#2C1B10] focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  placeholder="123456 (For manager damage approval)"
                 />
-                <span className="text-[11px] text-slate-400 mt-0.5 block">
-                  Managers verify and sign off on damaged crate write-offs and driver billing.
-                </span>
               </div>
 
-              {/* Receiving Notes */}
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                <label className="block text-[11px] font-black uppercase tracking-wider text-[#8C7361] mb-1">
                   Receiving Inspection Notes
                 </label>
                 <textarea
                   rows={2}
                   value={receiveNotes}
                   onChange={(e) => setReceiveNotes(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 text-slate-900 text-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  placeholder="e.g. Crushed top crates due to bumpy transit, remainder warm and shelf-ready"
+                  className="w-full px-3.5 py-2.5 bg-[#FAF7EE]/60 border border-[#EDE4D5] rounded-xl text-xs text-[#2C1B10] focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  placeholder="e.g. Arrived on time, fresh temperature"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#EDE4D5]">
                 <button
                   type="button"
                   onClick={() => setSelectedManifestForReceive(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-sm font-bold hover:bg-slate-50 transition-colors"
+                  className="flex-1 py-2.5 border border-[#EDE4D5] bg-white text-[#4A2E1B] font-bold rounded-xl text-xs cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-bold shadow-md transition-all flex items-center gap-2"
+                  className="flex-1 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs shadow-xs disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Accept Delivery &amp; Add to Shelf Stock
+                  {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Accept Delivery &amp; Add Stock
                 </button>
               </div>
             </form>
