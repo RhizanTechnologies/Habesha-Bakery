@@ -303,19 +303,19 @@ export default function ProductionPage() {
               return (
                 <div
                   key={batch.id}
-                  className={`p-4 rounded-2xl bg-[#FFFDF8] border shadow-xs space-y-3 ${
+                  className={`p-3.5 sm:p-4 rounded-2xl bg-[#FFFDF8] border shadow-xs space-y-3 overflow-hidden ${
                     batch.isFlagged ? 'border-rose-300 bg-rose-50/20' : 'border-[#EDE4D5]'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-extrabold text-sm text-[#2C1B10]">{batch.batchNumber}</span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-extrabold text-sm text-[#2C1B10] truncate">{batch.batchNumber}</span>
                         <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#FAF7EE] text-[#4A2E1B] border border-[#EDE4D5]">
                           {batch.shift}
                         </span>
                       </div>
-                      <p className="text-[11px] text-[#8C7361] mt-0.5">
+                      <p className="text-[11px] text-[#8C7361] mt-0.5 truncate">
                         {new Date(batch.createdAt).toLocaleString()} &bull; {batch.baker?.fullName || 'Master Baker'}
                       </p>
                     </div>

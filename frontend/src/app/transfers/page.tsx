@@ -397,11 +397,11 @@ export default function TransfersPage() {
             {/* Mobile Manifest Cards (< md) */}
             <div className="md:hidden p-3.5 space-y-3">
               {filteredManifests.map((manifest) => (
-                <div key={manifest.id} className="p-4 rounded-2xl bg-[#FFFDF8] border border-[#EDE4D5] shadow-xs space-y-3">
+                <div key={manifest.id} className="p-3.5 sm:p-4 rounded-2xl bg-[#FFFDF8] border border-[#EDE4D5] shadow-xs space-y-3 overflow-hidden">
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="font-mono font-bold text-sm text-[#2C1B10] block">{manifest.manifestNumber}</span>
-                      <span className="text-[10px] text-[#8C7361]">
+                    <div className="min-w-0">
+                      <span className="font-mono font-bold text-sm text-[#2C1B10] block truncate">{manifest.manifestNumber}</span>
+                      <span className="text-[10px] text-[#8C7361] block truncate">
                         {new Date(manifest.createdAt).toLocaleDateString()} &bull; {new Date(manifest.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>

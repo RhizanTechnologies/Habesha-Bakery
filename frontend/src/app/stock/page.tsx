@@ -363,15 +363,15 @@ export default function StockPage() {
             </div>
           ) : (
             stocks.map((item) => (
-              <div key={item.id} className="p-4 rounded-2xl bg-[#FFFDF8] border border-[#EDE4D5] shadow-xs space-y-3">
+              <div key={item.id} className="p-3.5 sm:p-4 rounded-2xl bg-[#FFFDF8] border border-[#EDE4D5] shadow-xs space-y-3 overflow-hidden">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-9 h-9 rounded-xl bg-[#FAF7EE] border border-[#EDE4D5] flex items-center justify-center text-[#E87A18] shrink-0">
                       <Wheat className="w-4 h-4" />
                     </div>
-                    <div>
-                      <h4 className="font-bold text-sm text-[#2C1B10]">{item.name}</h4>
-                      <p className="font-mono text-[11px] text-[#8C7361]">{item.sku}</p>
+                    <div className="min-w-0">
+                      <h4 className="font-bold text-sm text-[#2C1B10] truncate">{item.name}</h4>
+                      <p className="font-mono text-[11px] text-[#8C7361] truncate">{item.sku}</p>
                     </div>
                   </div>
                   <span

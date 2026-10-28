@@ -403,20 +403,20 @@ export default function BranchesPage() {
             {filteredBranches.map((b) => {
               const isActiveContext = activeBranch?.id === b.id;
               return (
-                <div key={b.id} className="p-4 rounded-2xl bg-[#FFFDF8] border border-[#EDE4D5] shadow-xs space-y-3">
+                <div key={b.id} className="p-3.5 sm:p-4 rounded-2xl bg-[#FFFDF8] border border-[#EDE4D5] shadow-xs space-y-3 overflow-hidden">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-9 h-9 rounded-xl bg-[#FAF7EE] border border-[#EDE4D5] flex items-center justify-center shrink-0">
                         {b.isHub ? <Building2 className="w-5 h-5 text-teal-700" /> : <Store className="w-5 h-5 text-[#E87A18]" />}
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-sm text-[#2C1B10]">{b.name}</span>
+                          <span className="font-extrabold text-sm text-[#2C1B10] truncate">{b.name}</span>
                           {isActiveContext && (
-                            <span className="px-1.5 py-0.5 text-[9px] font-black bg-teal-100 text-teal-800 rounded">ACTIVE</span>
+                            <span className="px-1.5 py-0.5 text-[9px] font-black bg-teal-100 text-teal-800 rounded shrink-0">ACTIVE</span>
                           )}
                         </div>
-                        <span className="font-mono text-[11px] text-[#8C7361]">{b.code}</span>
+                        <span className="font-mono text-[11px] text-[#8C7361] block truncate">{b.code}</span>
                       </div>
                     </div>
 
