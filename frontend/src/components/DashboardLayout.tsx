@@ -15,16 +15,9 @@ import {
   LayoutDashboard,
   Users,
   MapPin,
-  Package,
-  Banknote,
-  Layers,
   Boxes,
-  ArrowRightLeft,
   ChefHat,
-  BarChart3,
   Truck,
-  CalendarDays,
-  DollarSign,
   Utensils,
   Menu,
   X,
@@ -227,18 +220,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ] : []),
     ...((isOwner || isAdmin || role === 'DRIVER' || role === 'STOREKEEPER' || role === 'PRODUCTION_SUPERVISOR') ? [
       { icon: Truck, label: 'Crate Transfers', href: '/transfers' }
-    ] : []),
-    ...((isOwner || isAdmin || role === 'CASHIER') ? [
-      { icon: Package, label: 'Counter POS', href: '/pos' },
-      { icon: CalendarDays, label: 'Evening Closeout', href: '/daily-tracking/closeout' },
-    ] : []),
-    ...((isOwner || isAdmin) ? [
-      { icon: Layers, label: t('nav.categories') || 'Product Categories', href: '/product-categories' },
-      { icon: Package, label: t('nav.products') || 'Product Catalog', href: '/products' },
-      { icon: ArrowRightLeft, label: t('nav.conversions') || 'Conversions', href: '/product-conversions' },
-      { icon: DollarSign, label: t('nav.expenses') || 'Expenses', href: '/expenses' },
-      { icon: Banknote, label: t('nav.payroll') || 'Payroll', href: '/payroll' },
-      { icon: BarChart3, label: t('nav.reports') || 'Reports', href: '/reports' }
     ] : []),
   ], [isOwner, isAdmin, role, t]);
 
