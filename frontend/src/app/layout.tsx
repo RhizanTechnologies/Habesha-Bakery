@@ -3,6 +3,7 @@ import './globals.css';
 import { AuthProvider } from '../context/AuthContext';
 import { BranchProvider } from '../context/BranchContext';
 import { LanguageProvider } from '../context/LanguageContext';
+import QueryProvider from '../providers/QueryProvider';
 import { AppShell } from '../components/AppShell';
 import { Toaster } from '../components/ui/sonner';
 
@@ -27,16 +28,18 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-sans antialiased bg-[#FAF7EE] text-[#2C1B10]">
-        <LanguageProvider>
-          <AuthProvider>
-            <BranchProvider>
-              <AppShell>
-                {children}
-              </AppShell>
-              <Toaster />
-            </BranchProvider>
-          </AuthProvider>
-        </LanguageProvider>
+        <QueryProvider>
+          <LanguageProvider>
+            <AuthProvider>
+              <BranchProvider>
+                <AppShell>
+                  {children}
+                </AppShell>
+                <Toaster />
+              </BranchProvider>
+            </AuthProvider>
+          </LanguageProvider>
+        </QueryProvider>
       </body>
     </html>
   );

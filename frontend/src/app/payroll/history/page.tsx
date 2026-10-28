@@ -1,0 +1,524 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import DashboardLayout from "@/components/DashboardLayout";
+import { api } from "@/lib/axios";
+import { useAuth } from "@/context/AuthContext";
+import { useBranch } from "@/context/BranchContext";
+import { Edit2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { PayrollNav } from "../PayrollNav";
+import { formatEthDate, getEthMonthName } from "@/lib/ethiopianDate";
+import { useLanguage } from "@/context/LanguageContext";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PaginationControls } from "@/components/ui/PaginationControls";
+
+interface User {
+  id: string;
+  fullName: string;
+  phone: string;
+  role: string;
+}
+
+interface PayrollRecord {
+  id: string;
+  userId: string;
+  month: number;
+  year: number;
+  baseSalary: number;
+  loanDeductions: number;
+  penaltyDeductions: number;
+  bonus: number;
+  finalAmount: number;
+  paymentDate: string | null;
+  status?: string;
+  user?: User;
+}
+
+export default function PayrollHistoryPage() {
+  const { user } = useAuth();
+  const { selectedBranchId } = useBranch();
+  const { t } = useLanguage();
+  const queryClient = useQueryClient();
+  const [editingPayroll, setEditingPayroll] = useState<PayrollRecord | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [payrollToSign, setPayrollToSign] = useState<PayrollRecord | null>(null);
+  const [isSigning, setIsSigning] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 15;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedBranchId]);
+
+  const { data: pageResult, isLoading } = useQuery<{ items: PayrollRecord[]; meta?: any }>({
+    queryKey: ["payroll-history", selectedBranchId, currentPage],
+    placeholderData: (prev) => prev,
+    queryFn: async () => {
+      const params: any = { page: currentPage, limit: pageSize };
+      if (selectedBranchId) params.branchId = selectedBranchId;
+      const { data } = await api.get("/payroll", { params });
+      return data;
+    },
+  });
+
+  const history: PayrollRecord[] = pageResult?.items || (Array.isArray(pageResult) ? pageResult : []);
+  const meta = pageResult?.meta;
+
+  const handleUpdatePayroll = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingPayroll) return;
+    setIsSubmitting(true);
+    const fd = new FormData(e.currentTarget);
+    try {
+      await api.patch(`/payroll/${editingPayroll.id}`, {
+        baseSalary: fd.get("baseSalary"),
+        bonus: fd.get("bonus"),
+        loanDeductions: fd.get("loanDeductions"),
+        penaltyDeductions: fd.get("penaltyDeductions"),
+        finalAmount: fd.get("finalAmount"),
+        paymentDate: fd.get("paymentDate") || null,
+        status: fd.get("status"),
+      });
+      toast.success(t('payroll.recordUpdated') || "Payroll record updated successfully");
+      setIsEditOpen(false);
+      setEditingPayroll(null);
+      queryClient.invalidateQueries({ queryKey: ["payroll-history"] });
+      queryClient.invalidateQueries({ queryKey: ["payroll"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Failed to update payroll record");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleApprovePayroll = async (id: string) => {
+    try {
+      await api.post(`/payroll/${id}/approve`);
+      toast.success(t('payroll.markedSignedSuccess') || "Marked as signed successfully");
+      queryClient.invalidateQueries({ queryKey: ["payroll-history"] });
+      queryClient.invalidateQueries({ queryKey: ["payroll"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Failed to mark payroll as signed");
+    }
+  };
+
+  return (
+    <DashboardLayout>
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#2C1B10]">
+            {t('payroll.historyTitle')}
+          </h1>
+          <p className="text-xs sm:text-sm text-[#8C7361] mt-0.5">
+            {t('payroll.historySubtitle')}
+          </p>
+        </div>
+        <PayrollNav />
+      </div>
+
+      {/* Mobile Cards View (block md:hidden) */}
+      <div className="block md:hidden space-y-3">
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-white rounded-2xl p-4 border border-[#EDE4D5] shadow-xs space-y-3">
+                <div className="flex justify-between items-center pb-2 border-b border-[#F4ECE1]">
+                  <Skeleton className="h-5 w-32" />
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-20" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : history.length === 0 ? (
+          <div className="bg-white p-6 rounded-2xl text-center text-[#8C7361] font-medium border border-[#EDE4D5]">
+            {t('profile.noPayslipsFound')}
+          </div>
+        ) : (
+          history.map((r) => (
+            <div key={r.id} className="bg-white rounded-2xl p-3.5 sm:p-4 border border-[#EDE4D5] shadow-xs space-y-3 overflow-hidden">
+              <div className="flex items-start justify-between gap-2 min-w-0">
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-extrabold text-[#2C1B10] text-sm sm:text-base truncate">{r.user?.fullName}</h3>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                    <span className="text-xs text-[#8C7361] font-medium">{r.user?.role}</span>
+                    <span className="text-xs text-[#8C7361]">•</span>
+                    <span className="text-xs font-bold text-[#E87A18]">
+                      {getEthMonthName(r.month)} {r.year}
+                    </span>
+                  </div>
+                </div>
+                <Badge className={`text-[10px] font-bold shrink-0 px-2 py-0.5 ${
+                  r.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                  r.status === 'REJECTED' ? 'bg-rose-100 text-rose-800 border-rose-300' :
+                  'bg-amber-100 text-amber-800 border-amber-300'
+                }`}>
+                  {r.status === 'APPROVED' ? `✍️ ${t('payroll.signedOnPaper')}` : r.status === 'REJECTED' ? t('common.rejected') : `⏳ ${t('payroll.pendingPaperSignature')}`}
+                </Badge>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-100 text-xs">
+                <div>
+                  <span className="text-[#8C7361] block text-[10px] uppercase font-semibold">{t('payroll.colBaseSalary')}</span>
+                  <span className="font-bold text-[#2C1B10] font-mono">{r.baseSalary} ETB</span>
+                </div>
+                <div>
+                  <span className="text-[#8C7361] block text-[10px] uppercase font-semibold">{t('payroll.colBonuses')}</span>
+                  <span className="font-bold text-emerald-700 font-mono">
+                    {r.bonus > 0 ? `+${r.bonus} ETB` : "0.00 ETB"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[#8C7361] block text-[10px] uppercase font-semibold">{t('profile.colLoanDeductionMinus')}</span>
+                  <span className="font-bold text-rose-700 font-mono">
+                    -{Number(r.loanDeductions) + Number(r.penaltyDeductions)} ETB
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[#8C7361] block text-[10px] uppercase font-semibold">{t('payroll.colNetSalary')}</span>
+                  <span className="font-extrabold text-emerald-700 text-sm font-mono">{r.finalAmount} ETB</span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-100 text-xs text-[#8C7361]">
+                <span className="text-[11px] sm:text-xs">{t('common.paid')}: {formatEthDate(r.paymentDate, true)}</span>
+                {(user?.role === "OWNER" || user?.role === "ADMIN") && (
+                  <div className="flex items-center gap-2">
+                    {r.status === "PENDING_APPROVAL" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPayrollToSign(r)}
+                        className="h-8 px-2.5 text-xs font-bold bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100"
+                      >
+                        ✍️ {t('payroll.markAsSigned')}
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setEditingPayroll(r);
+                        setIsEditOpen(true);
+                      }}
+                      className="h-8 px-3 text-xs font-bold text-[#4A2E1B] border-[#EDE4D5] hover:bg-[#FAF6F0]"
+                    >
+                      <Edit2 className="w-3.5 h-3.5 mr-1" /> {t('common.edit')}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Table View (hidden md:block) */}
+      <div className="hidden md:block bg-white rounded-2xl border border-[#EDE4D5] shadow-xs overflow-hidden">
+        <Table>
+          <TableHeader className="bg-zinc-50">
+            <TableRow>
+              <TableHead className="font-extrabold text-[#2C1B10]">{t('profile.colPeriod')}</TableHead>
+              <TableHead className="font-extrabold text-[#2C1B10]">{t('payroll.colStaffMember')}</TableHead>
+              <TableHead className="font-extrabold text-[#2C1B10]">{t('payroll.colBaseSalary')}</TableHead>
+              <TableHead className="font-extrabold text-[#2C1B10]">{t('payroll.colBonuses')}</TableHead>
+              <TableHead className="font-extrabold text-rose-700">{t('profile.colLoanDeductionMinus')}</TableHead>
+              <TableHead className="font-extrabold text-emerald-700">{t('payroll.colNetSalary')}</TableHead>
+              <TableHead className="font-extrabold text-[#2C1B10]">{t('common.date')}</TableHead>
+              <TableHead className="font-extrabold text-center text-[#2C1B10]">{t('common.status')}</TableHead>
+              {(user?.role === "OWNER" || user?.role === "ADMIN") && <TableHead className="text-right pr-6">{t('common.actions')}</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, idx) => (
+                <TableRow key={idx}>
+                  <TableCell><Skeleton className="h-4 w-28 mb-1" /><Skeleton className="h-3 w-16" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-16 mx-auto rounded-full" /></TableCell>
+                  {(user?.role === "OWNER" || user?.role === "ADMIN") && (
+                    <TableCell className="text-right pr-6"><Skeleton className="h-8 w-16 ml-auto rounded-xl" /></TableCell>
+                  )}
+                </TableRow>
+              ))
+            ) : history.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} className="text-center py-10 text-[#8C7361] font-medium">
+                  {t('profile.noPayslipsFound')}
+                </TableCell>
+              </TableRow>
+            ) : (
+              history.map((r) => (
+                <TableRow key={r.id} className="hover:bg-[#FAF6F0]/50 transition-colors">
+                  <TableCell className="font-extrabold text-[#2C1B10]">
+                    {getEthMonthName(r.month)} {r.year}
+                  </TableCell>
+                  <TableCell>
+                    <span className="font-bold text-[#2C1B10]">{r.user?.fullName}</span>{" "}
+                    <span className="text-xs text-[#8C7361] font-semibold">({r.user?.role})</span>
+                  </TableCell>
+                  <TableCell className="font-semibold text-[#2C1B10]">
+                    {r.baseSalary} ETB
+                  </TableCell>
+                  <TableCell className="text-emerald-700 font-bold">
+                    {r.bonus > 0 ? (
+                      <Badge variant="secondary" className="shrink-0 text-[10px] font-bold bg-emerald-100 text-emerald-800 border-emerald-200">
+                        +{r.bonus} ETB
+                      </Badge>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell className="text-rose-700 font-bold">
+                    -{Number(r.loanDeductions) + Number(r.penaltyDeductions)} ETB
+                  </TableCell>
+                  <TableCell className="font-extrabold text-emerald-700 text-sm font-mono">
+                    {r.finalAmount} ETB
+                  </TableCell>
+                  <TableCell className="text-xs font-semibold text-[#8C7361]">
+                    {formatEthDate(r.paymentDate, true)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge className={`text-[10px] font-bold ${
+                      r.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                      r.status === 'REJECTED' ? 'bg-rose-100 text-rose-800 border-rose-300' :
+                      'bg-amber-100 text-amber-800 border-amber-300'
+                    }`}>
+                      {r.status === 'APPROVED' ? `✍️ ${t('payroll.signedOnPaper')}` : r.status === 'REJECTED' ? t('common.rejected') : `⏳ ${t('payroll.pendingPaperSignature')}`}
+                    </Badge>
+                  </TableCell>
+                  {(user?.role === "OWNER" || user?.role === "ADMIN") && (
+                    <TableCell className="text-right pr-6 space-x-2 whitespace-nowrap">
+                      {r.status === "PENDING_APPROVAL" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setPayrollToSign(r)}
+                          className="font-bold text-xs bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100 shadow-2xs"
+                        >
+                          ✍️ {t('payroll.markAsSigned')}
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setEditingPayroll(r);
+                          setIsEditOpen(true);
+                        }}
+                        className="font-bold text-xs text-blue-700 hover:text-blue-800 hover:bg-blue-50"
+                      >
+                        <Edit2 className="w-3.5 h-3.5 mr-1" /> Edit
+                      </Button>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {meta && meta.totalPages > 1 && (
+        <div className="mt-4 flex justify-end">
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={meta.totalPages}
+            totalItems={meta.totalItems}
+            pageSize={meta.limit}
+            onPageChange={setCurrentPage}
+          />
+        </div>
+      )}
+
+      {/* Edit Payroll Modal */}
+      {isEditOpen && editingPayroll && (
+        <Dialog open={true} onOpenChange={(open) => !open && setIsEditOpen(false)}>
+          <DialogContent className="max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-extrabold text-[#2C1B10]">Edit Payroll Execution Record</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleUpdatePayroll} className="space-y-3.5 py-2">
+              <div>
+                <label className="text-xs font-bold text-[#2C1B10] block mb-1">Base Salary (ETB)</label>
+                <Input
+                  name="baseSalary"
+                  type="number"
+                  step="0.01"
+                  defaultValue={editingPayroll.baseSalary}
+                  onFocus={(e) => e.target.select()}
+                  required
+                  className="h-10 rounded-xl border-zinc-200 font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-[#2C1B10] block mb-1">Bonus (ETB)</label>
+                <Input
+                  name="bonus"
+                  type="number"
+                  step="0.01"
+                  defaultValue={editingPayroll.bonus}
+                  onFocus={(e) => e.target.select()}
+                  required
+                  className="h-10 rounded-xl border-zinc-200 font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-[#2C1B10] block mb-1">Loan Deductions (ETB)</label>
+                <Input
+                  name="loanDeductions"
+                  type="number"
+                  step="0.01"
+                  defaultValue={editingPayroll.loanDeductions}
+                  onFocus={(e) => e.target.select()}
+                  required
+                  className="h-10 rounded-xl border-zinc-200 font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-[#2C1B10] block mb-1">Penalty Deductions (ETB)</label>
+                <Input
+                  name="penaltyDeductions"
+                  type="number"
+                  step="0.01"
+                  defaultValue={editingPayroll.penaltyDeductions}
+                  onFocus={(e) => e.target.select()}
+                  required
+                  className="h-10 rounded-xl border-zinc-200 font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-[#2C1B10] block mb-1">Final Net Payout (ETB)</label>
+                <Input
+                  name="finalAmount"
+                  type="number"
+                  step="0.01"
+                  defaultValue={editingPayroll.finalAmount}
+                  onFocus={(e) => e.target.select()}
+                  required
+                  className="h-10 rounded-xl border-zinc-200 font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-[#2C1B10] block mb-1">{t('common.status')}</label>
+                <select name="status" defaultValue={editingPayroll.status || "PENDING_APPROVAL"} required className="w-full h-10 border border-zinc-200 rounded-xl px-3 text-sm bg-white">
+                  <option value="PENDING_APPROVAL">⏳ {t('payroll.pendingPaperSignature')}</option>
+                  <option value="APPROVED">✍️ {t('payroll.signedOnPaper')}</option>
+                  <option value="REJECTED">✕ {t('common.rejected')}</option>
+                </select>
+              </div>
+              <DialogFooter className="flex flex-col sm:flex-row gap-2 w-full pt-3">
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full sm:w-auto h-11 sm:h-10 bg-[#4A2E1B] hover:bg-[#3D2314] text-white font-bold rounded-xl order-1 sm:order-2 shadow-sm"
+                >
+                  {isSubmitting ? "Saving..." : "Save Changes"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditOpen(false)}
+                  className="w-full sm:w-auto h-10 rounded-xl border-[#EDE4D5] hover:bg-[#FAF6F0] order-2 sm:order-1"
+                >
+                  Cancel
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* CONFIRM PHYSICAL SIGNATURE DIALOG */}
+      {payrollToSign && (
+        <Dialog open={true} onOpenChange={(open) => !open && setPayrollToSign(null)}>
+          <DialogContent className="max-w-md rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-extrabold text-[#2C1B10] flex items-center gap-2">
+                ✍️ {t('payroll.confirmSignTitle')}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-3 text-sm text-[#4A2E1B] space-y-3">
+              <p className="leading-relaxed">
+                {t('payroll.confirmSignDesc').replace('{name}', payrollToSign.user?.fullName || 'the employee')}
+              </p>
+              <div className="p-3 bg-[#FAF6F0] rounded-xl border border-[#EDE4D5] text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-[#8C7361]">{t('payroll.colStaffMember')}:</span>
+                  <strong className="text-[#2C1B10]">{payrollToSign.user?.fullName}</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#8C7361]">{t('profile.colPeriod')}:</span>
+                  <strong>{getEthMonthName(payrollToSign.month)} {payrollToSign.year}</strong>
+                </div>
+                <div className="flex justify-between border-t border-[#EDE4D5]/70 pt-1">
+                  <span className="text-[#8C7361]">{t('payroll.colNetSalary')}:</span>
+                  <strong className="text-emerald-800 font-mono font-black">{payrollToSign.finalAmount} ETB</strong>
+                </div>
+              </div>
+              <p className="text-xs text-[#8C7361]">
+                Please ensure you have physically collected the signed payroll receipt / payslip before confirming.
+              </p>
+            </div>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 w-full pt-2">
+              <Button
+                type="button"
+                size="lg"
+                loading={isSigning}
+                onClick={async () => {
+                  if (!payrollToSign) return;
+                  setIsSigning(true);
+                  try {
+                    await api.post(`/payroll/${payrollToSign.id}/approve`);
+                    toast.success(t('payroll.markedSignedSuccess') || "Marked as signed successfully");
+                    setPayrollToSign(null);
+                    queryClient.invalidateQueries({ queryKey: ["payroll-history"] });
+                    queryClient.invalidateQueries({ queryKey: ["payroll"] });
+                    queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+                  } catch (err: any) {
+                    toast.error(err.response?.data?.error || "Failed to mark payroll as signed");
+                  } finally {
+                    setIsSigning(false);
+                  }
+                }}
+                className="w-full sm:w-auto order-1 sm:order-2 bg-emerald-700 hover:bg-emerald-800 text-white font-bold"
+              >
+                ✍️ {t('payroll.confirmSignBtn')}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                disabled={isSigning}
+                onClick={() => setPayrollToSign(null)}
+                className="w-full sm:w-auto order-2 sm:order-1"
+              >
+                {t('common.cancel')}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </DashboardLayout>
+  );
+}

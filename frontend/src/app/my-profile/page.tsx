@@ -1,0 +1,1026 @@
+'use client';
+
+import React, { useEffect, useState, useRef } from 'react';
+import DashboardLayout from '@/components/DashboardLayout';
+import { api } from '@/lib/axios';
+import { useAuth } from '@/context/AuthContext';
+import { useLanguage } from '@/context/LanguageContext';
+import { getImageUrl, getFileUrl } from '@/lib/utils';
+import {
+  User,
+  Building2,
+  Calendar,
+  Clock,
+  Banknote,
+  Wallet,
+  AlertTriangle,
+  Receipt,
+  CheckCircle2,
+  Phone,
+  Lock,
+  Camera,
+  Check,
+  X,
+  ShieldCheck,
+  FileText,
+} from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { format } from 'date-fns';
+import { formatEthDate, getEthMonthName, EthDateTime } from '@/lib/ethiopianDate';
+import { toast } from 'sonner';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { DetailSkeleton, KpiCardsSkeleton, TableSkeleton } from '@/components/ui/skeletons';
+
+interface DashboardData {
+  user: {
+    id: string;
+    fullName: string;
+    phone: string;
+    role: string;
+    salary: number | null;
+    startDate: string | null;
+    lastPaidDate: string | null;
+    shift: string | null;
+    avatarUrl?: string | null;
+    filesUrl: string | null;
+    branch?: {
+      id: string;
+      name: string;
+    } | null;
+  };
+  payrollRecords: Array<{
+    id: string;
+    month: number;
+    year: number;
+    baseSalary: number;
+    loanDeductions: number;
+    penaltyDeductions: number;
+    bonus: number;
+    finalAmount: number;
+    status: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+    paymentDate: string | null;
+    createdAt: string;
+  }>;
+  loans: Array<{
+    id: string;
+    totalAmount: number;
+    remainingBalance: number;
+    status: 'PENDING_APPROVAL' | 'OPEN' | 'PAID' | 'REJECTED';
+    type: string;
+    date: string;
+    createdAt: string;
+    payments?: Array<{
+      id: string;
+      amount: number;
+      createdAt: string;
+    }>;
+  }>;
+  penalties: Array<{
+    id: string;
+    amount: number;
+    reason: string;
+    status?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+    date: string;
+    isDeducted: boolean;
+    createdAt: string;
+  }>;
+}
+
+function money(value: number | undefined | null) {
+  return `${Number(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ETB`;
+}
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+export default function MyProfilePage() {
+  const { user: authUser, updateUser } = useAuth();
+  const { t } = useLanguage();
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<'payroll' | 'loans' | 'penalties' | 'settings'>('payroll');
+
+  const getRoleLabel = (role?: string) => {
+    if (!role) return t('common.employee');
+    const roleKeyMap: Record<string, string> = {
+      OWNER: 'users.roleOwner',
+      ADMIN: 'users.roleAdmin',
+      BAKER: 'users.roleBaker',
+      CAKE_WORKER: 'users.roleCakeWorker',
+      SAMBUSA_WORKER: 'users.roleSambusaWorker',
+      SALESPERSON: 'users.roleSalesperson',
+      CASHIER: 'users.roleCashier',
+      FINANCE_OFFICER: 'users.roleFinanceOfficer',
+      DELIVERY_MAN: 'users.roleDeliveryMan',
+      STOCK_KEEPER: 'users.roleStockKeeper',
+      AUDITOR: 'users.roleAuditor',
+    };
+    const key = roleKeyMap[role];
+    return key ? t(key as any) : role.replace('_', ' ');
+  };
+
+  const getShiftLabel = (shift?: string | null) => {
+    if (!shift) return t('common.standard');
+    if (shift === 'DAY') return `☀️ ${t('production.dayShiftFull')}`;
+    if (shift === 'NIGHT') return `🌙 ${t('production.nightShiftFull')}`;
+    return `${shift} Shift`;
+  };
+
+  const { data = null, isLoading: loading } = useQuery<DashboardData | null>({
+    queryKey: ['my-profile-dashboard', authUser?.id],
+    placeholderData: (prev) => prev,
+    staleTime: 60 * 1000,
+    queryFn: async () => {
+      const res = await api.get('/users/me/dashboard');
+      return res.data;
+    },
+    enabled: !!authUser?.id,
+  });
+
+  // Tab auto-centering ref
+  const tabRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const btn = tabRefs.current[activeTab];
+      if (btn) {
+        btn.scrollIntoView({
+          behavior: 'smooth',
+          inline: 'center',
+          block: 'nearest',
+        });
+      }
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [activeTab]);
+
+  // Settings State
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPass, setIsChangingPass] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const [heroAvatarError, setHeroAvatarError] = useState(false);
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentPassword || !newPassword) {
+      toast.error(t('profile.enterBothPasswords'));
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error(t('profile.passwordsDoNotMatch'));
+      return;
+    }
+    setIsChangingPass(true);
+    try {
+      await api.post('/users/me/change-password', { currentPassword, newPassword });
+      toast.success(t('profile.passwordSuccess'));
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || t('profile.failedChangePassword') || 'Failed to change password');
+    } finally {
+      setIsChangingPass(false);
+    }
+  };
+
+  const handleFileSelection = (file: File | null) => {
+    if (!file) {
+      setSelectedFile(null);
+      return;
+    }
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
+    if (!allowed.includes(file.type.toLowerCase())) {
+      toast.error(t('profile.unsupportedFileFormat') || "Unsupported file format. Please select a JPG, PNG, or WebP image.");
+      setSelectedFile(null);
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error(t('profile.fileTooLarge') || "File is too large. Maximum allowed size is 5MB.");
+      setSelectedFile(null);
+      return;
+    }
+    setSelectedFile(file);
+  };
+
+  const handleAvatarUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedFile) {
+      toast.error(t('profile.selectFilePrompt'));
+      return;
+    }
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/jpg"];
+    if (!allowed.includes(selectedFile.type.toLowerCase())) {
+      toast.error(t('profile.unsupportedFileFormat') || "Unsupported file format. Please select a JPG, PNG, or WebP image.");
+      return;
+    }
+    if (selectedFile.size > 5 * 1024 * 1024) {
+      toast.error(t('profile.fileTooLarge') || "File is too large. Maximum allowed size is 5MB.");
+      return;
+    }
+    setIsUploadingAvatar(true);
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+
+    try {
+      const res = await api.post('/users/me/profile-picture', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success(t('profile.avatarSuccess'));
+      setSelectedFile(null);
+      setIsAvatarModalOpen(false);
+      if (res.data?.avatarUrl && updateUser) {
+        setHeroAvatarError(false);
+        updateUser({ avatarUrl: res.data.avatarUrl });
+      }
+      queryClient.invalidateQueries({ queryKey: ['my-profile-dashboard'] });
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || t('profile.failedUploadAvatar') || 'Failed to upload profile picture');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  if (loading && !data && !authUser) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-6 max-w-6xl mx-auto pb-12">
+          <DetailSkeleton />
+          <KpiCardsSkeleton count={3} />
+          <TableSkeleton rows={5} columns={6} />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const u = data?.user || authUser;
+  const payrolls = data?.payrollRecords || [];
+  const loans = data?.loans || [];
+  const penalties = data?.penalties || [];
+
+  const pendingLoans = loans.filter((l) => l.status === 'PENDING_APPROVAL');
+  const pendingPenalties = penalties.filter((p) => p.status === 'PENDING_APPROVAL');
+  const pendingPayrolls = payrolls.filter((pr) => pr.status === 'PENDING_APPROVAL');
+  const pendingCount = pendingLoans.length + pendingPenalties.length + pendingPayrolls.length;
+
+  // Current Ethiopian period & Net calculations for this month
+  const currentEth = EthDateTime.fromEuropeanDate(new Date());
+  const currentMonthPayroll = payrolls.find(
+    (pr) => pr.year === currentEth.year && pr.month === currentEth.month
+  );
+
+  const totalLoanBalance = loans
+    .filter((l) => l.status === 'OPEN')
+    .reduce((acc, l) => acc + Number(l.remainingBalance || 0), 0);
+  const activePenalties = penalties.filter((p) => p.status !== 'REJECTED' && !p.isDeducted);
+  const totalPenaltyAmount = activePenalties.reduce((acc, p) => acc + Number(p.amount || 0), 0);
+  
+  const baseSalary = Number(u?.salary || 0);
+  const netThisMonth = currentMonthPayroll
+    ? Number(currentMonthPayroll.finalAmount || 0)
+    : Math.max(0, baseSalary - totalLoanBalance - totalPenaltyAmount);
+
+  return (
+    <DashboardLayout>
+      {/* ── Page Header & Profile Card ── */}
+      <div className="mb-5 xs:mb-8">
+        <div className="bg-gradient-to-r from-[#2C1B10] via-[#4A2E1B] to-[#5A3A23] rounded-2xl xs:rounded-3xl p-3.5 xs:p-5 md:p-8 text-white shadow-xl relative overflow-hidden">
+          <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 opacity-10 pointer-events-none">
+            <User className="w-96 h-96 text-white" />
+          </div>
+
+          <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 xs:gap-6">
+            <div className="flex items-center space-x-3 xs:space-x-5 min-w-0 w-full md:w-auto">
+              <button
+                type="button"
+                onClick={() => setIsAvatarModalOpen(true)}
+                className="relative group cursor-pointer rounded-2xl overflow-hidden focus:outline-none focus:ring-2 focus:ring-[#E87A18] shrink-0"
+                title={t('profile.clickToUpdateAvatar')}
+              >
+                {u?.avatarUrl && !heroAvatarError ? (
+                  <img
+                    src={getImageUrl(u.avatarUrl)!}
+                    alt={u.fullName}
+                    onError={() => setHeroAvatarError(true)}
+                    className="w-14 h-14 xs:w-16 xs:h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-white/40 shadow-lg group-hover:scale-105 transition-transform"
+                  />
+                ) : (
+                  <div className="w-14 h-14 xs:w-16 xs:h-16 sm:w-20 sm:h-20 rounded-2xl bg-[#E87A18] text-white flex items-center justify-center font-extrabold text-xl xs:text-2xl sm:text-3xl shadow-lg border-2 border-white/20 group-hover:scale-105 transition-transform">
+                    {u?.fullName ? u.fullName.charAt(0).toUpperCase() : 'E'}
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[9px] xs:text-[10px] font-bold">
+                  <Camera className="w-4 h-4 xs:w-5 xs:h-5 mb-0.5" />
+                  <span>{t('profile.changeAvatarLabel')}</span>
+                </div>
+              </button>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-1.5 xs:gap-2 mb-1">
+                  <Badge className="bg-[#E87A18] text-white text-[10px] xs:text-xs px-2 xs:px-3 py-0.5 uppercase tracking-wider font-extrabold border-none">
+                    {getRoleLabel(u?.role)}
+                  </Badge>
+                  {/* Assigned Branch (Prominently displayed on both Mobile & Desktop) */}
+                  <span className="text-[10px] xs:text-xs font-semibold text-amber-100 flex items-center bg-white/15 backdrop-blur-sm px-2.5 py-0.5 rounded-full shrink-0 border border-white/15 shadow-2xs">
+                    <Building2 className="w-3 h-3 mr-1 text-amber-300 shrink-0" />
+                    <span>{u?.branch?.name || t('users.globalAllBranches') || "Global / All Branches"}</span>
+                  </span>
+                  <span className="md:hidden text-[10px] xs:text-xs font-semibold text-amber-200/90 flex items-center bg-white/10 px-2 xs:px-2.5 py-0.5 rounded-full shrink-0">
+                    <Clock className="w-3 h-3 mr-1 text-amber-300 shrink-0" />
+                    <span>{getShiftLabel(u?.shift)}</span>
+                  </span>
+                  <span className="md:hidden text-[10px] xs:text-xs font-semibold text-amber-200/90 flex items-center bg-white/10 px-2 xs:px-2.5 py-0.5 rounded-full shrink-0">
+                    <Calendar className="w-3 h-3 mr-1 text-amber-300 shrink-0" />
+                    <span>{u?.startDate ? formatEthDate(u.startDate) : t('common.na')}</span>
+                  </span>
+                </div>
+                <h1 className="text-lg xs:text-2xl md:text-3xl font-extrabold tracking-tight truncate">{u?.fullName}</h1>
+                <div className="flex flex-wrap items-center gap-3 mt-0.5 xs:mt-1">
+                  <p className="text-[11px] xs:text-xs md:text-sm text-amber-100/70 font-medium flex items-center truncate">
+                    <Phone className="w-3 h-3 xs:w-3.5 xs:h-3.5 mr-1 xs:mr-1.5 shrink-0" /> <span className="truncate">{u?.phone}</span>
+                  </p>
+                  {u?.filesUrl && (
+                    <a
+                      href={getFileUrl(u.filesUrl) || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] xs:text-xs font-semibold text-white bg-white/20 hover:bg-white/30 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 transition-colors"
+                    >
+                      <FileText className="w-3 h-3 text-amber-200" />
+                      <span>{t('profile.idDocumentPdf') || "ID Document (PDF)"}</span>
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ── Mobile View: Financial Snapshot (Hidden on Desktop to prevent duplicate cards) ── */}
+            <div className="md:hidden grid grid-cols-2 gap-3 xs:gap-5 w-full bg-white/10 p-3 xs:p-4 rounded-xl xs:rounded-2xl backdrop-blur-md border border-white/10">
+              <div className="space-y-2">
+                <div>
+                  <span className="text-[9px] xs:text-[10px] uppercase font-bold text-amber-200/80 block">{t('profile.baseSalary')}</span>
+                  <span className="text-xs xs:text-sm md:text-base font-extrabold truncate block">{money(u?.salary)}</span>
+                </div>
+                <div className="pt-2 border-t border-white/10">
+                  <span className="text-[9px] xs:text-[10px] uppercase font-bold text-amber-200/80 block">{t('profile.loanBalance')}</span>
+                  <span className="text-xs xs:text-sm md:text-base font-extrabold truncate block text-amber-300">{money(totalLoanBalance)}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div>
+                  <span className="text-[9px] xs:text-[10px] uppercase font-bold text-amber-200/80 block">{t('profile.penaltiesTotal')}</span>
+                  <span className="text-xs xs:text-sm md:text-base font-extrabold truncate block text-rose-300">{money(totalPenaltyAmount)}</span>
+                </div>
+                <div className="pt-2 border-t border-white/10">
+                  <span className="text-[9px] xs:text-[10px] uppercase font-bold text-amber-200/80 block">{t('profile.netSalaryThisMonth') || "Net (This Month)"}</span>
+                  <span className="text-xs xs:text-sm md:text-base font-extrabold truncate block text-emerald-300">{money(netThisMonth)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Desktop View: Employment Profile & Assignment Details (Hidden on Mobile) ── */}
+            <div className="hidden md:grid grid-cols-2 gap-x-6 gap-y-3 w-auto min-w-[340px] bg-white/10 p-4 rounded-2xl backdrop-blur-md border border-white/10 shrink-0">
+              <div className="space-y-1">
+                <span className="text-[10px] uppercase tracking-wider font-bold text-amber-200/80 flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                  {t('users.assignedBranchLabel') || "Assigned Branch"}
+                </span>
+                <span className="text-sm font-extrabold text-white truncate block">
+                  {u?.branch?.name || t('users.globalAllBranches') || "Global / All Branches"}
+                </span>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-[10px] uppercase tracking-wider font-bold text-amber-200/80 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                  {t('users.shiftLabel') || "Working Shift"}
+                </span>
+                <span className="text-sm font-extrabold text-white truncate block">
+                  {getShiftLabel(u?.shift)}
+                </span>
+              </div>
+
+              <div className="pt-2 border-t border-white/10 space-y-1">
+                <span className="text-[10px] uppercase tracking-wider font-bold text-amber-200/80 flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                  {t('users.startDateLabel') || "Employment Date"}
+                </span>
+                <span className="text-sm font-extrabold text-white truncate block">
+                  {u?.startDate ? formatEthDate(u.startDate) : t('common.na')}
+                </span>
+              </div>
+
+              <div className="pt-2 border-t border-white/10 space-y-1">
+                <span className="text-[10px] uppercase tracking-wider font-bold text-amber-200/80 flex items-center gap-1.5">
+                  <Receipt className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                  {t('profile.payslipsHistoryTitle') || "Salary Records"}
+                </span>
+                <span className="text-sm font-extrabold text-white truncate block">
+                  {payrolls.length > 0
+                    ? `${payrolls.length} ${t('common.records') || 'Recorded'}`
+                    : t('common.na')}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Key Metrics Summary Cards (Hidden on Mobile) ── */}
+      {loading && !data ? (
+        <div className="hidden md:block mb-5 xs:mb-8">
+          <KpiCardsSkeleton count={4} />
+        </div>
+      ) : (
+        <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-5 xs:mb-8">
+          <Card className="border-[#EDE4D5] bg-white rounded-2xl shadow-xs hover:border-[#E87A18]/40 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 px-4 pt-3.5">
+              <CardTitle className="text-xs font-bold uppercase text-[#8C7361] tracking-wider">{t('profile.baseSalary')}</CardTitle>
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-700 flex items-center justify-center shrink-0">
+                <Banknote className="h-5 w-5" />
+              </div>
+            </CardHeader>
+            <CardContent className="px-4 pb-3.5 pt-0">
+              <div className="text-2xl sm:text-3xl font-extrabold text-[#2C1B10] tracking-tight">{money(u?.salary)}</div>
+              <p className="text-xs text-[#8C7361] font-semibold mt-1">{t('profile.monthlyBaseRate')}</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-[#EDE4D5] bg-white rounded-2xl shadow-xs hover:border-[#E87A18]/40 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 px-4 pt-3.5">
+              <CardTitle className="text-xs font-bold uppercase text-[#8C7361] tracking-wider">{t('profile.loanBalance')}</CardTitle>
+              <div className="w-9 h-9 rounded-xl bg-indigo-500/10 text-indigo-700 flex items-center justify-center shrink-0">
+                <Wallet className="h-5 w-5" />
+              </div>
+            </CardHeader>
+            <CardContent className="px-4 pb-3.5 pt-0">
+              <div className="text-2xl sm:text-3xl font-extrabold text-[#2C1B10] tracking-tight">{money(totalLoanBalance)}</div>
+              <p className="text-xs text-[#8C7361] font-semibold mt-1">
+                {t('profile.activeLoansCount', { count: loans.filter((l) => l.status === 'OPEN').length })}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-[#EDE4D5] bg-white rounded-2xl shadow-xs hover:border-[#E87A18]/40 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 px-4 pt-3.5">
+              <CardTitle className="text-xs font-bold uppercase text-[#8C7361] tracking-wider">{t('profile.penaltiesTotal')}</CardTitle>
+              <div className="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-700 flex items-center justify-center shrink-0">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 pt-0">
+              <div className="text-2xl sm:text-3xl font-extrabold text-rose-700 tracking-tight">{money(totalPenaltyAmount)}</div>
+              <p className="text-xs text-[#8C7361] font-semibold mt-1">{t('profile.loggedPenaltiesCount', { count: activePenalties.length })}</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-[#EDE4D5] bg-white rounded-2xl shadow-xs hover:border-[#E87A18]/40 transition-colors">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1.5 px-4 pt-3.5">
+              <CardTitle className="text-xs font-bold uppercase text-[#8C7361] tracking-wider">{t('profile.netSalaryThisMonth') || "Net Salary (This Month)"}</CardTitle>
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-700 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+            </CardHeader>
+            <CardContent className="px-4 pb-3.5 pt-0">
+              <div className="text-2xl sm:text-3xl font-extrabold text-emerald-700 tracking-tight">{money(netThisMonth)}</div>
+              <p className="text-xs text-[#8C7361] font-semibold mt-1">
+                {currentMonthPayroll
+                  ? (t('profile.payslipRecorded', { month: getEthMonthName(currentEth.month) }) || `Payslip recorded for ${getEthMonthName(currentEth.month)}`)
+                  : (t('profile.netSalaryThisMonthSub') || 'After loan & penalty deductions')}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ── Main Navigation Tabs ── */}
+      <div className="bg-white rounded-2xl xs:rounded-3xl border border-[#EDE4D5] shadow-xs overflow-hidden mb-6 xs:mb-8">
+        {/* Sleek Segmented Pill Tabs with Auto-Centering & Edge Fade Hints */}
+        <div className="relative">
+          {/* Subtle scroll edge gradient hints on mobile to indicate scrollability */}
+          <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-[#FAF7EE] to-transparent z-10 sm:hidden" />
+          <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-[#FAF7EE] to-transparent z-10 sm:hidden" />
+
+          <div className="bg-[#FAF7EE] px-2 py-1.5 xs:py-2 border-b border-[#EDE4D5] flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth [scroll-padding:0_3rem]">
+            <button
+              ref={(el) => { tabRefs.current['payroll'] = el; }}
+              type="button"
+              onClick={() => setActiveTab('payroll')}
+              className={`px-3 py-2 rounded-xl text-xs xs:text-sm font-extrabold transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap shrink-0 outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A18] ${
+                activeTab === 'payroll'
+                  ? 'bg-white text-[#E87A18] shadow-xs ring-1 ring-[#E87A18]/25'
+                  : 'text-[#8C7361] hover:text-[#2C1B10] hover:bg-white/50'
+              }`}
+            >
+              <Receipt className="w-3.5 h-3.5 xs:w-4 xs:h-4 shrink-0" />
+              <span>{t('profile.tabPayslips', { count: payrolls.length })}</span>
+            </button>
+
+            <button
+              ref={(el) => { tabRefs.current['loans'] = el; }}
+              type="button"
+              onClick={() => setActiveTab('loans')}
+              className={`px-3 py-2 rounded-xl text-xs xs:text-sm font-extrabold transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap shrink-0 outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A18] ${
+                activeTab === 'loans'
+                  ? 'bg-white text-[#E87A18] shadow-xs ring-1 ring-[#E87A18]/25'
+                  : 'text-[#8C7361] hover:text-[#2C1B10] hover:bg-white/50'
+              }`}
+            >
+              <Wallet className="w-3.5 h-3.5 xs:w-4 xs:h-4 shrink-0" />
+              <span>{t('profile.tabLoans', { count: loans.length })}</span>
+            </button>
+
+            <button
+              ref={(el) => { tabRefs.current['penalties'] = el; }}
+              type="button"
+              onClick={() => setActiveTab('penalties')}
+              className={`px-3 py-2 rounded-xl text-xs xs:text-sm font-extrabold transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap shrink-0 outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A18] ${
+                activeTab === 'penalties'
+                  ? 'bg-white text-[#E87A18] shadow-xs ring-1 ring-[#E87A18]/25'
+                  : 'text-[#8C7361] hover:text-[#2C1B10] hover:bg-white/50'
+              }`}
+            >
+              <AlertTriangle className="w-3.5 h-3.5 xs:w-4 xs:h-4 shrink-0" />
+              <span>{t('profile.tabPenalties', { count: penalties.length })}</span>
+            </button>
+
+            <button
+              ref={(el) => { tabRefs.current['settings'] = el; }}
+              type="button"
+              onClick={() => setActiveTab('settings')}
+              className={`px-3 py-2 rounded-xl text-xs xs:text-sm font-extrabold transition-all duration-200 flex items-center gap-1.5 whitespace-nowrap shrink-0 outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E87A18] ${
+                activeTab === 'settings'
+                  ? 'bg-white text-[#E87A18] shadow-xs ring-1 ring-[#E87A18]/25'
+                  : 'text-[#8C7361] hover:text-[#2C1B10] hover:bg-white/50'
+              }`}
+            >
+              <Lock className="w-3.5 h-3.5 xs:w-4 xs:h-4 shrink-0" />
+              <span>{t('profile.tabSecurity')}</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-3.5 xs:p-5 sm:p-6">
+          {loading && !data ? (
+            <TableSkeleton rows={5} columns={6} />
+          ) : (
+            <>
+              {/* TAB 1: PAYROLL */}
+              {activeTab === 'payroll' && (
+            <div>
+              <h3 className="text-sm xs:text-base font-extrabold text-[#2C1B10] mb-3 xs:mb-4">{t('profile.payslipsHistoryTitle')}</h3>
+              {payrolls.length === 0 ? (
+                <div className="py-10 text-center bg-[#FAF7EE] rounded-2xl border border-dashed border-[#EDE4D5]">
+                  <p className="text-sm font-bold text-[#4A2E1B]">{t('profile.noPayslipsFound')}</p>
+                </div>
+              ) : (
+                <>
+                  {/* Mobile Receipt Cards (< md) */}
+                  <div className="space-y-3 md:hidden">
+                    {payrolls.map((pr) => {
+                      const isApproved = pr.status === 'APPROVED';
+                      const isRejected = pr.status === 'REJECTED';
+                      const statusLabel = isApproved ? t('common.approved') : isRejected ? t('common.rejected') : t('common.pendingReview');
+                      const statusBadgeClass = isApproved
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                        : isRejected
+                        ? 'bg-rose-100 text-rose-800 border-rose-300'
+                        : 'bg-amber-100 text-amber-800 border-amber-300';
+
+                      return (
+                        <div key={pr.id} className="bg-[#FFFDF8] border border-[#EDE4D5] rounded-2xl p-3.5 shadow-xs space-y-2.5">
+                          <div className="flex items-center justify-between border-b border-[#EDE4D5]/70 pb-2 gap-2">
+                            <div className="font-extrabold text-sm text-[#2C1B10] whitespace-nowrap">
+                              {getEthMonthName(pr.month)} {pr.year}
+                            </div>
+                            <Badge className={`font-bold text-[10px] px-2 py-0.5 shrink-0 ${statusBadgeClass}`}>
+                              {statusLabel}
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-[#8C7361] block">{t('profile.colBaseSalary')}</span>
+                              <span className="font-bold text-[#2C1B10]">{money(pr.baseSalary)}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-[#8C7361] block">{t('profile.colBonusPlus')}</span>
+                              <span className="font-bold text-emerald-600">{Number(pr.bonus) > 0 ? `+${money(pr.bonus)}` : '-'}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-[#8C7361] block">{t('profile.colLoanDeductionMinus')}</span>
+                              <span className="font-bold text-rose-600">{Number(pr.loanDeductions) > 0 ? `-${money(pr.loanDeductions)}` : '-'}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-[#8C7361] block">{t('profile.colPenaltyDeductionMinus')}</span>
+                              <span className="font-bold text-rose-600">{Number(pr.penaltyDeductions) > 0 ? `-${money(pr.penaltyDeductions)}` : '-'}</span>
+                            </div>
+                          </div>
+                          <div className="pt-2 border-t border-[#EDE4D5]/70 flex items-center justify-between bg-emerald-50/70 -mx-3.5 -mb-3.5 p-3 rounded-b-2xl">
+                            <span className="text-[11px] xs:text-xs font-extrabold text-emerald-900 uppercase tracking-wide">{t('profile.colFinalNetPaid')}</span>
+                            <span className="text-sm font-black text-emerald-700">{money(pr.finalAmount)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Desktop Full Table (>= md) */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t('profile.colPeriod')}</TableHead>
+                          <TableHead className="text-right">{t('profile.colBaseSalary')}</TableHead>
+                          <TableHead className="text-right">{t('profile.colBonusPlus')}</TableHead>
+                          <TableHead className="text-right">{t('profile.colLoanDeductionMinus')}</TableHead>
+                          <TableHead className="text-right">{t('profile.colPenaltyDeductionMinus')}</TableHead>
+                          <TableHead className="text-right">{t('profile.colFinalNetPaid')}</TableHead>
+                          <TableHead className="text-center">{t('profile.colStatus')}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {payrolls.map((pr) => {
+                          const isApproved = pr.status === 'APPROVED';
+                          const isRejected = pr.status === 'REJECTED';
+                          const statusLabel = isApproved ? t('common.approved') : isRejected ? t('common.rejected') : t('common.pendingReview');
+                          const statusBadgeClass = isApproved
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            : isRejected
+                            ? 'bg-rose-100 text-rose-800 border-rose-300'
+                            : 'bg-amber-100 text-amber-800 border-amber-300';
+
+                          return (
+                            <TableRow key={pr.id}>
+                              <TableCell className="font-bold">{getEthMonthName(pr.month)} {pr.year}</TableCell>
+                              <TableCell className="text-right">{money(pr.baseSalary)}</TableCell>
+                              <TableCell className="text-right text-emerald-600">{Number(pr.bonus) > 0 ? `+${money(pr.bonus)}` : '-'}</TableCell>
+                              <TableCell className="text-right text-rose-600">{Number(pr.loanDeductions) > 0 ? `-${money(pr.loanDeductions)}` : '-'}</TableCell>
+                              <TableCell className="text-right text-rose-600">{Number(pr.penaltyDeductions) > 0 ? `-${money(pr.penaltyDeductions)}` : '-'}</TableCell>
+                              <TableCell className="text-right font-extrabold text-emerald-700">{money(pr.finalAmount)}</TableCell>
+                              <TableCell className="text-center">
+                                <Badge className={`font-bold text-[10px] ${statusBadgeClass}`}>
+                                  {statusLabel}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: LOANS */}
+          {activeTab === 'loans' && (
+            <div>
+              <h3 className="text-sm xs:text-base font-extrabold text-[#2C1B10] mb-3 xs:mb-4">{t('profile.loansAdvancesTitle')}</h3>
+              {loans.length === 0 ? (
+                <div className="py-10 text-center bg-[#FAF7EE] rounded-2xl border border-dashed border-[#EDE4D5]">
+                  <p className="text-sm font-bold text-[#4A2E1B]">{t('profile.noLoansLogged')}</p>
+                </div>
+              ) : (
+                <>
+                  {/* Mobile Loan Cards (< md) */}
+                  <div className="space-y-3 md:hidden">
+                    {loans.map((l) => {
+                      const total = Number(l.totalAmount || 0);
+                      const balance = Number(l.remainingBalance || 0);
+                      const paid = Math.max(0, total - balance);
+                      const percentPaid = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 100;
+                      const isPaid = l.status === 'PAID';
+                      const isPending = l.status === 'PENDING_APPROVAL';
+                      const isRejected = l.status === 'REJECTED';
+                      const statusLabel = isPaid ? t('common.paidInFull') : isPending ? (t('payroll.pendingPaperSignature') || t('common.pendingApproval')) : isRejected ? t('common.rejected') : (t('payroll.signedOnPaper') || t('common.active'));
+                      const statusBadgeClass = isPaid
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                        : isPending
+                        ? 'bg-amber-100 text-amber-800 border-amber-300'
+                        : isRejected
+                        ? 'bg-rose-100 text-rose-800 border-rose-300'
+                        : 'bg-emerald-100 text-emerald-800 border-emerald-300';
+
+                      return (
+                        <div key={l.id} className="bg-[#FFFDF8] border border-[#EDE4D5] rounded-2xl p-3.5 shadow-xs space-y-2.5">
+                          <div className="flex items-center justify-between border-b border-[#EDE4D5]/70 pb-2 gap-2">
+                            <div className="font-extrabold text-xs text-[#2C1B10] flex items-center gap-1.5 whitespace-nowrap">
+                              <Calendar className="w-3.5 h-3.5 text-[#E87A18] shrink-0" />
+                              <span>{formatEthDate(l.createdAt)}</span>
+                            </div>
+                            <Badge className={`font-bold text-[10px] px-2 py-0.5 shrink-0 ${statusBadgeClass}`}>
+                              {statusLabel}
+                            </Badge>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-[#8C7361] block">{t('profile.loanAmount') || t('profile.totalAdvance') || "Loan Amount"}</span>
+                              <span className="font-bold text-[#2C1B10]">{money(l.totalAmount)}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-[#8C7361] block">{t('profile.remainingBalance')}</span>
+                              <span className="font-black text-indigo-700">{money(l.remainingBalance)}</span>
+                            </div>
+                          </div>
+                          <div className="pt-1">
+                            <div className="flex justify-between text-[10px] font-bold text-[#8C7361] mb-1">
+                              <span>{t('profile.repaidPercent', { percent: percentPaid })}</span>
+                              <span>{t('profile.paidAmountText', { amount: money(paid) })}</span>
+                            </div>
+                            <div className="w-full bg-[#EDE4D5] rounded-full h-1.5 overflow-hidden">
+                              <div className="bg-[#E87A18] h-1.5 rounded-full transition-all duration-300" style={{ width: `${percentPaid}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Desktop Table (>= md) */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t('common.date')}</TableHead>
+                          <TableHead className="text-right">{t('profile.colOriginalAmount')}</TableHead>
+                          <TableHead className="text-right">{t('profile.remainingBalance')}</TableHead>
+                          <TableHead className="text-center">{t('profile.colStatus')}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {loans.map((l) => {
+                          const isPaid = l.status === 'PAID';
+                          const isPending = l.status === 'PENDING_APPROVAL';
+                          const isRejected = l.status === 'REJECTED';
+                          const statusLabel = isPaid ? t('common.paidInFull') : isPending ? (t('payroll.pendingPaperSignature') || t('common.pendingApproval')) : isRejected ? t('common.rejected') : (t('payroll.signedOnPaper') || t('common.active'));
+                          const statusBadgeClass = isPaid
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            : isPending
+                            ? 'bg-amber-100 text-amber-800 border-amber-300'
+                            : isRejected
+                            ? 'bg-rose-100 text-rose-800 border-rose-300'
+                            : 'bg-emerald-100 text-emerald-800 border-emerald-300';
+
+                          return (
+                            <TableRow key={l.id}>
+                              <TableCell className="font-bold">{formatEthDate(l.createdAt)}</TableCell>
+                              <TableCell className="text-right">{money(l.totalAmount)}</TableCell>
+                              <TableCell className="text-right font-extrabold text-indigo-700">{money(l.remainingBalance)}</TableCell>
+                              <TableCell className="text-center">
+                                <Badge className={`font-bold text-[10px] ${statusBadgeClass}`}>
+                                  {statusLabel}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: PENALTIES */}
+          {activeTab === 'penalties' && (
+            <div>
+              <h3 className="text-sm xs:text-base font-extrabold text-[#2C1B10] mb-3 xs:mb-4">{t('profile.penaltiesTitle')}</h3>
+              {penalties.length === 0 ? (
+                <div className="py-10 text-center bg-[#FAF7EE] rounded-2xl border border-dashed border-[#EDE4D5]">
+                  <CheckCircle2 className="w-9 h-9 text-emerald-600 mx-auto mb-2" />
+                  <p className="text-sm font-bold text-[#4A2E1B]">{t('profile.noPenaltiesClean')}</p>
+                  <p className="text-xs text-[#8C7361] mt-1">{t('profile.noPenaltiesDesc')}</p>
+                </div>
+              ) : (
+                <>
+                  {/* Mobile Penalty Cards (< md) */}
+                  <div className="space-y-3 md:hidden">
+                    {penalties.map((p) => {
+                      const isApproved = p.status === 'APPROVED';
+                      const isRejected = p.status === 'REJECTED';
+                      const statusLabel = isApproved ? t('common.approved') : isRejected ? t('common.rejected') : t('common.pendingApproval');
+                      const statusBadgeClass = isApproved
+                        ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                        : isRejected
+                        ? 'bg-rose-100 text-rose-800 border-rose-300'
+                        : 'bg-amber-100 text-amber-800 border-amber-300';
+
+                      return (
+                        <div key={p.id} className="bg-[#FFFDF8] border border-rose-200/70 rounded-2xl p-3.5 shadow-xs space-y-3">
+                          {/* Header: Date on left, Single status badge on right */}
+                          <div className="flex items-center justify-between border-b border-[#EDE4D5]/70 pb-2.5 gap-2">
+                            <div className="font-extrabold text-xs text-[#2C1B10] flex items-center gap-1.5 whitespace-nowrap">
+                              <Calendar className="w-3.5 h-3.5 text-[#E87A18] shrink-0" />
+                              <span>{formatEthDate(p.createdAt)}</span>
+                            </div>
+                            <Badge className={`font-bold text-[10px] px-2 py-0.5 shrink-0 ${statusBadgeClass}`}>
+                              {statusLabel}
+                            </Badge>
+                          </div>
+
+                          {/* Reason */}
+                          <div>
+                            <span className="text-[10px] uppercase font-bold text-[#8C7361] block">{t('profile.reasonNoticeLabel')}</span>
+                            <p className="text-xs font-bold text-[#2C1B10] mt-0.5 break-words">{p.reason || t('profile.noReasonProvided')}</p>
+                          </div>
+
+                          {/* Deduction Status Row */}
+                          <div className="flex items-center justify-between text-xs pt-1">
+                            <span className="text-[10px] uppercase font-bold text-[#8C7361]">{t('profile.salaryDeductionLabel')}</span>
+                            <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full ${
+                              p.isDeducted ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                            }`}>
+                              {p.isDeducted ? t('profile.deductedFromSalary') : t('profile.pendingNextPayroll')}
+                            </span>
+                          </div>
+
+                          {/* Amount Highlight Footer */}
+                          <div className="pt-2 border-t border-[#EDE4D5]/70 flex items-center justify-between bg-rose-50/70 -mx-3.5 -mb-3.5 p-3 rounded-b-2xl">
+                            <span className="text-[11px] xs:text-xs font-bold text-rose-900 uppercase tracking-wide">{t('profile.penaltyAmountLabel')}</span>
+                            <span className="text-sm font-black text-rose-700">{money(p.amount)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Desktop Table (>= md) */}
+                  <div className="hidden md:block overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t('profile.colDateLogged')}</TableHead>
+                          <TableHead>{t('common.reason')}</TableHead>
+                          <TableHead className="text-right">{t('common.amount')}</TableHead>
+                          <TableHead className="text-center">{t('profile.colApprovalStatus')}</TableHead>
+                          <TableHead className="text-center">{t('profile.colDeductionStatus')}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {penalties.map((p) => {
+                          const isApproved = p.status === 'APPROVED';
+                          const isRejected = p.status === 'REJECTED';
+                          const statusLabel = isApproved ? t('common.approved') : isRejected ? t('common.rejected') : t('common.pendingApproval');
+                          const statusBadgeClass = isApproved
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            : isRejected
+                            ? 'bg-rose-100 text-rose-800 border-rose-300'
+                            : 'bg-amber-100 text-amber-800 border-amber-300';
+
+                          return (
+                            <TableRow key={p.id}>
+                              <TableCell className="font-bold">{formatEthDate(p.createdAt)}</TableCell>
+                              <TableCell>{p.reason}</TableCell>
+                              <TableCell className="text-right font-bold text-rose-700">{money(p.amount)}</TableCell>
+                              <TableCell className="text-center">
+                                <Badge className={`font-bold text-[10px] ${statusBadgeClass}`}>
+                                  {statusLabel}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Badge className={`font-bold text-[10px] ${p.isDeducted ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                  {p.isDeducted ? t('common.deducted') : t('common.pendingSalary')}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* TAB 5: SECURITY SETTINGS */}
+          {activeTab === 'settings' && (
+            <div className="max-w-xl">
+              <div className="bg-[#FAF7EE] border border-[#EDE4D5] rounded-2xl p-4 xs:p-6 shadow-xs">
+                <h4 className="text-sm xs:text-base font-extrabold text-[#2C1B10] mb-1 flex items-center gap-2">
+                  <Lock className="w-4 h-4 xs:w-5 xs:h-5 text-[#E87A18]" /> {t('profile.changePasswordTitle')}
+                </h4>
+                <p className="text-[11px] xs:text-xs text-[#8C7361] mb-4 xs:mb-5">{t('profile.changePasswordDesc')}</p>
+
+                <form onSubmit={handlePasswordChange} className="space-y-3.5 xs:space-y-4">
+                  <div>
+                    <label className="text-xs font-bold text-[#2C1B10] mb-1 block">{t('profile.currentPasswordLabel')}</label>
+                    <Input
+                      type="password"
+                      required
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      className="bg-white border-zinc-200 rounded-xl h-11 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-[#2C1B10] mb-1 block">{t('profile.newPasswordLabel')}</label>
+                    <Input
+                      type="password"
+                      required
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="bg-white border-zinc-200 rounded-xl h-11 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-[#2C1B10] mb-1 block">{t('profile.confirmNewPasswordLabel')}</label>
+                    <Input
+                      type="password"
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="bg-white border-zinc-200 rounded-xl h-11 text-sm"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={isChangingPass}
+                    className="min-h-[44px] h-11 w-full xs:w-auto bg-[#4A2E1B] hover:bg-[#3D2314] text-white font-bold rounded-xl text-xs px-6 mt-2"
+                  >
+                    {isChangingPass ? t('profile.updatingPasswordBtn') : t('profile.updatePasswordBtn')}
+                  </Button>
+                </form>
+              </div>
+            </div>
+          )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* ── PROFILE PICTURE POPUP DIALOG ── */}
+      <Dialog open={isAvatarModalOpen} onOpenChange={setIsAvatarModalOpen}>
+        <DialogContent className="w-[calc(100vw-1.5rem)] max-w-md rounded-2xl p-4 xs:p-6 bg-white border-[#EDE4D5]">
+          <DialogHeader>
+            <DialogTitle className="text-base xs:text-lg font-extrabold text-[#2C1B10] flex items-center gap-2">
+              <Camera className="w-5 h-5 text-[#E87A18]" /> {t('profile.changeProfilePicTitle')}
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleAvatarUpload} className="space-y-4 py-2">
+            <p className="text-xs text-[#8C7361]">
+              {t('profile.changeProfilePicDesc')}
+            </p>
+
+            <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl">
+              <p className="text-xs font-bold text-amber-900 mb-0.5">
+                📷 {t('profile.supportedFormatsLabel') || "Supported Formats:"}
+              </p>
+              <p className="text-[11px] text-amber-800">
+                {t('profile.supportedFormatsDesc') || "JPG, JPEG, PNG, WebP (Maximum allowed size: 5MB)"}
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center justify-center p-3 xs:p-4 bg-[#FAF7EE] border border-dashed border-[#EDE4D5] rounded-2xl">
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/jpg"
+                onChange={(e) => handleFileSelection(e.target.files?.[0] || null)}
+                className="w-full text-xs text-[#2C1B10] file:mr-2.5 file:py-2 file:px-3 xs:file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-[#E87A18] file:text-white hover:file:bg-[#d46d13]"
+              />
+              {selectedFile && (
+                <div className="mt-2.5 text-xs text-emerald-700 font-semibold flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                  <span>✓ {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)</span>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="flex-col xs:flex-row gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                onClick={() => setIsAvatarModalOpen(false)}
+                className="w-full xs:w-auto"
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button
+                type="submit"
+                size="lg"
+                loading={isUploadingAvatar}
+                disabled={!selectedFile}
+                className="w-full xs:w-auto"
+              >
+                {t('profile.saveAvatarPictureBtn')}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </DashboardLayout>
+  );
+}

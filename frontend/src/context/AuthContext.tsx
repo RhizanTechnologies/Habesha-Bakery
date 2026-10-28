@@ -35,6 +35,8 @@ export interface User {
   branchId: string | null;
   branch?: Branch | null;
   salary?: number | null;
+  startDate?: string | null;
+  lastPaidDate?: string | null;
   shift?: string | null;
   avatarUrl?: string | null;
   filesUrl?: string | null;
