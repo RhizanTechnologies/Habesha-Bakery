@@ -42,7 +42,9 @@ interface MenuItem {
 interface SidebarNavProps {
   user: any;
   activeHref: string | undefined;
+  pendingHref: string | null;
   menuItems: MenuItem[];
+  onNavigate: (href: string) => void;
   onCloseMobile?: () => void;
   logout: () => void;
   logoutLabel: string;
@@ -53,7 +55,9 @@ interface SidebarNavProps {
 const SidebarNav = React.memo(function SidebarNav({
   user,
   activeHref,
+  pendingHref,
   menuItems,
+  onNavigate,
   onCloseMobile,
   logout,
   logoutLabel,
@@ -94,20 +98,31 @@ const SidebarNav = React.memo(function SidebarNav({
         </div>
         <ul className="space-y-1.5">
           {menuItems.map((item) => {
-            const isActive = item.href === activeHref;
+            const isTarget = item.href === (pendingHref || activeHref);
+            const isPendingThis = pendingHref === item.href;
             return (
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  onClick={onCloseMobile}
-                  className={`flex items-center space-x-3 px-4 py-3 rounded-xl font-semibold text-sm transition-colors duration-150 ${
-                    isActive
-                      ? 'bg-[#E87A18] text-white shadow-[0_4px_16px_rgba(232,122,24,0.45)] font-bold'
+                  onClick={(e) => {
+                    if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+                      e.preventDefault();
+                      onNavigate(item.href);
+                    } else {
+                      onCloseMobile?.();
+                    }
+                  }}
+                  className={`flex items-center space-x-3 px-4 py-3 rounded-xl font-semibold text-sm transition-all duration-150 cursor-pointer ${
+                    isTarget
+                      ? 'bg-[#E87A18] text-white shadow-[0_4px_16px_rgba(232,122,24,0.45)] font-bold scale-[1.01]'
                       : 'text-[#E2C7B4] hover:bg-[#5A3A23] hover:text-white'
                   }`}
                 >
-                  <item.icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-[#E2C7B4]'}`} />
-                  <span className="truncate">{item.label}</span>
+                  <item.icon className={`w-4 h-4 shrink-0 ${isTarget ? 'text-white' : 'text-[#E2C7B4]'}`} />
+                  <span className="truncate flex-1">{item.label}</span>
+                  {isPendingThis && (
+                    <span className="w-2 h-2 rounded-full bg-white animate-ping shrink-0" />
+                  )}
                 </Link>
               </li>
             );
@@ -147,6 +162,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [headerAvatarError, setHeaderAvatarError] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [, startTransition] = React.useTransition();
 
   useEffect(() => {
     setIsMounted(true);
@@ -158,10 +176,39 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [isMounted, isLoading, isAuthenticated, router]);
 
-  // Close mobile drawer on route change without window jump
+  // Sync state and finish navigation as soon as route changes
   useEffect(() => {
+    setPendingHref(null);
+    setIsNavigating(false);
     setIsMobileOpen(false);
   }, [pathname]);
+
+  // Safety fallback in case route transition stalls
+  useEffect(() => {
+    if (!isNavigating) return;
+    const timer = setTimeout(() => {
+      setIsNavigating(false);
+      setPendingHref(null);
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [isNavigating]);
+
+  const handleNavigate = React.useCallback((href: string) => {
+    if (pathname === href) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setIsMobileOpen(false);
+      return;
+    }
+    // Instantly mark the sidebar item active
+    setPendingHref(href);
+    setIsNavigating(true);
+    setIsMobileOpen(false);
+
+    // Trigger router navigation inside transition
+    startTransition(() => {
+      router.push(href);
+    });
+  }, [pathname, router]);
 
   const role = user?.role;
   const isOwner = role === 'OWNER';
@@ -221,6 +268,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <DashboardLayoutContext.Provider value={{ isNested: true }}>
+      {/* Top Global Indeterminate Navigation Progress Bar */}
+      {isNavigating && (
+        <div className="fixed top-0 left-0 right-0 z-50 h-[3px] bg-[#FAF7EE]/60 overflow-hidden shadow-sm pointer-events-none">
+          <div className="h-full bg-gradient-to-r from-[#E87A18] via-[#FFB067] to-[#E87A18] animate-progress-indeterminate" />
+        </div>
+      )}
+
       <div className="min-h-screen bg-[#FAF7EE] text-[#2C1B10] flex p-1.5 xs:p-2.5 sm:p-3 md:p-6 font-sans w-full max-w-full overflow-x-hidden">
         {/* Mobile & Tablet Drawer Overlay */}
         {isMobileOpen && (
@@ -239,7 +293,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <SidebarNav
             user={user}
             activeHref={activeHref}
+            pendingHref={pendingHref}
             menuItems={menuItems}
+            onNavigate={handleNavigate}
             onCloseMobile={() => setIsMobileOpen(false)}
             logout={logout}
             logoutLabel={logoutLabel}
@@ -252,7 +308,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <SidebarNav
             user={user}
             activeHref={activeHref}
+            pendingHref={pendingHref}
             menuItems={menuItems}
+            onNavigate={handleNavigate}
             logout={logout}
             logoutLabel={logoutLabel}
             menuLabel={menuLabel}
@@ -294,6 +352,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
 
             <div className="flex items-center space-x-1.5 xs:space-x-2.5 md:space-x-4 shrink-0">
+              {/* Live Route Loading Indicator Badge */}
+              {isNavigating && (
+                <div className="hidden sm:flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-[#E87A18]/10 text-[#E87A18] border border-[#E87A18]/20 text-xs font-bold animate-pulse shrink-0">
+                  <span className="w-2 h-2 rounded-full bg-[#E87A18] animate-ping" />
+                  <span>Loading...</span>
+                </div>
+              )}
+
               {/* Notification Bell */}
               <NotificationBell />
 
@@ -323,8 +389,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </header>
 
-          {/* Dynamic Page Content (Only this updates on route change) */}
-          <main className="flex-1 px-0.5 xs:px-1 sm:px-2 w-full max-w-full min-w-0">
+          {/* Dynamic Page Content (Smoothly fades while route loads) */}
+          <main className={`flex-1 px-0.5 xs:px-1 sm:px-2 w-full max-w-full min-w-0 transition-opacity duration-200 ${isNavigating ? 'opacity-60 pointer-events-none' : 'opacity-100'}`}>
             <div className="max-w-7xl mx-auto space-y-4 xs:space-y-6 w-full max-w-full min-w-0">
               {children}
             </div>
