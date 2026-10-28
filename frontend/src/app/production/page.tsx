@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { apiRequest } from '../../lib/api';
+import { formatEthDate } from '../../lib/ethiopianDate';
 import {
   Flame,
   Wheat,
@@ -17,6 +18,10 @@ import {
   Clock,
   ShieldAlert,
   Info,
+  ChevronRight,
+  Eye,
+  Flag,
+  User,
 } from 'lucide-react';
 
 interface BatchItem {
@@ -61,7 +66,17 @@ export default function ProductionPage() {
   const [metrics, setMetrics] = useState<ProductionMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'ALL' | 'FLAGGED'>('ALL');
+
+  // Filter States
+  const [filterTab, setFilterTab] = useState<'ALL' | 'TODAY' | 'FLAGGED'>('ALL');
+  const [shiftFilter, setShiftFilter] = useState<'ALL' | 'DAY' | 'NIGHT'>('ALL');
+
+  // Ethiopian Local Time (UTC+3)
+  const ethNow = useMemo(() => new Date(Date.now() + 3 * 3600 * 1000), []);
+  const todayYmd = useMemo(() => ethNow.toISOString().slice(0, 10), [ethNow]);
+  const yesterdayYmd = useMemo(() => {
+    return new Date(ethNow.getTime() - 24 * 3600 * 1000).toISOString().slice(0, 10);
+  }, [ethNow]);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -147,7 +162,29 @@ export default function ProductionPage() {
     }
   };
 
-  const displayedBatches = batches.filter((b) => (filter === 'FLAGGED' ? b.isFlagged : true));
+  // Filter batches
+  const displayedBatches = useMemo(() => {
+    return batches.filter((batch) => {
+      // 1. Shift filter
+      if (shiftFilter !== 'ALL' && batch.shift !== shiftFilter) {
+        return false;
+      }
+      // 2. Tab filter
+      if (filterTab === 'FLAGGED') {
+        return batch.isFlagged;
+      }
+      if (filterTab === 'TODAY') {
+        const batchYmd = (batch.createdAt || '').slice(0, 10);
+        return batchYmd === todayYmd;
+      }
+      return true;
+    });
+  }, [batches, filterTab, shiftFilter, todayYmd]);
+
+  // Tab counts
+  const allCount = batches.length;
+  const todayCount = batches.filter((b) => (b.createdAt || '').slice(0, 10) === todayYmd).length;
+  const flaggedCount = batches.filter((b) => b.isFlagged).length;
 
   return (
     <div className="space-y-6">
@@ -158,7 +195,7 @@ export default function ProductionPage() {
             <Flame className="w-3.5 h-3.5" />
             Kitchen &bull; 1,362 Yield Physics Engine
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#2C1B10] tracking-tight font-heading">
+          <h1 className="text-xl xs:text-2xl sm:text-3xl font-extrabold text-[#2C1B10] tracking-tight font-heading">
             Baking Batches &amp; Yield Variance Control
           </h1>
           <p className="text-xs sm:text-sm text-[#8C7361] font-medium mt-0.5">
@@ -172,7 +209,7 @@ export default function ProductionPage() {
             setFormError(null);
             setIsModalOpen(true);
           }}
-          className="px-4 py-2.5 bg-[#E87A18] hover:bg-[#D96B10] active:scale-[0.99] text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
+          className="px-4 py-2.5 bg-[#E87A18] hover:bg-[#D96B10] active:scale-[0.99] text-white font-bold rounded-xl text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer self-start sm:self-auto shrink-0"
         >
           <PlusCircle className="w-4 h-4 text-white" />
           <span>Record Baking Batch</span>
@@ -198,7 +235,8 @@ export default function ProductionPage() {
             </div>
           </div>
           <div className="text-2xl sm:text-3xl font-extrabold text-[#2C1B10] tracking-tight font-heading mt-2 font-mono">
-            {metrics?.totalLoavesBaked.toLocaleString() || '0'} <span className="text-sm font-semibold text-[#8C7361]">Loaves</span>
+            {metrics?.totalLoavesBaked.toLocaleString() || '0'}{' '}
+            <span className="text-sm font-semibold text-[#8C7361]">Loaves</span>
           </div>
           <p className="text-[11px] text-[#8C7361] font-semibold mt-1">
             Expected: {metrics?.totalExpectedLoaves.toLocaleString() || '0'} loaves
@@ -216,7 +254,8 @@ export default function ProductionPage() {
             </div>
           </div>
           <div className="text-2xl sm:text-3xl font-extrabold text-[#2C1B10] tracking-tight font-heading mt-2 font-mono">
-            {metrics?.totalSacksUsed || 0} <span className="text-sm font-semibold text-[#8C7361]">Sacks</span>
+            {metrics?.totalSacksUsed || 0}{' '}
+            <span className="text-sm font-semibold text-[#8C7361]">Sacks</span>
           </div>
           <p className="text-[11px] text-[#8C7361] font-semibold mt-1">
             Mass: {((metrics?.totalSacksUsed || 0) * 50).toLocaleString()} kg flour
@@ -233,7 +272,11 @@ export default function ProductionPage() {
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight font-heading mt-2 font-mono ${(metrics?.averageEfficiency || 100) >= 90 ? 'text-emerald-700' : 'text-rose-700'}`}>
+          <div
+            className={`text-2xl sm:text-3xl font-extrabold tracking-tight font-heading mt-2 font-mono ${
+              (metrics?.averageEfficiency || 100) >= 90 ? 'text-emerald-700' : 'text-rose-700'
+            }`}
+          >
             {metrics?.averageEfficiency || 100}%
           </div>
           <p className="text-[11px] text-[#8C7361] font-semibold mt-1">
@@ -247,183 +290,427 @@ export default function ProductionPage() {
             <span className="text-xs font-bold uppercase text-[#8C7361] tracking-wider">
               Under-Yield Flags (&lt;90%)
             </span>
-            <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold ${(metrics?.flaggedCount || 0) > 0 ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+            <div
+              className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold ${
+                (metrics?.flaggedCount || 0) > 0
+                  ? 'bg-rose-50 text-rose-700'
+                  : 'bg-emerald-50 text-emerald-700'
+              }`}
+            >
               <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
-          <div className={`text-2xl sm:text-3xl font-extrabold tracking-tight font-heading mt-2 font-mono ${(metrics?.flaggedCount || 0) > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
-            {metrics?.flaggedCount || 0} <span className="text-sm font-semibold text-[#8C7361]">Batches</span>
+          <div
+            className={`text-2xl sm:text-3xl font-extrabold tracking-tight font-heading mt-2 font-mono ${
+              (metrics?.flaggedCount || 0) > 0 ? 'text-rose-700' : 'text-emerald-700'
+            }`}
+          >
+            {metrics?.flaggedCount || 0}{' '}
+            <span className="text-sm font-semibold text-[#8C7361]">Batches</span>
           </div>
           <p className="text-[11px] text-[#8C7361] font-semibold mt-1">
-            {(metrics?.flaggedCount || 0) > 0 ? 'Requires supervisor investigation' : 'No yield anomalies detected'}
+            {(metrics?.flaggedCount || 0) > 0
+              ? 'Requires supervisor investigation'
+              : 'No yield anomalies detected'}
           </p>
         </div>
       </div>
 
-      {/* ── Baking Batches Table ── */}
-      <div className="border border-[#EDE4D5] bg-white rounded-3xl shadow-2xs overflow-hidden">
-        <div className="p-5 border-b border-[#EDE4D5] flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#FAF7EE]/30">
-          <div>
-            <h3 className="text-base font-extrabold text-[#2C1B10]">Baking Batch Logs &amp; Yield Audit</h3>
-            <p className="text-xs text-[#8C7361]">Complete shift logbook verifying loaves produced per sack of flour</p>
-          </div>
-
-          {/* Filter Pills */}
-          <div className="flex items-center gap-1.5 self-start sm:self-auto bg-white p-1 rounded-2xl border border-[#EDE4D5]">
+      {/* ── Filter Tabs & Shift Selector (Identical to reference ERP) ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#EDE4D5] pb-3 max-w-full overflow-hidden">
+        {/* Left Filter Tabs */}
+        <div className="relative overflow-hidden flex-1 max-w-full">
+          <div className="flex items-center gap-1.5 xs:gap-2 overflow-x-auto no-scrollbar scroll-smooth px-0.5">
             <button
-              onClick={() => setFilter('ALL')}
-              className={`px-3 py-1 rounded-xl text-xs font-bold transition-colors cursor-pointer ${filter === 'ALL' ? 'bg-[#E87A18] text-white shadow-xs' : 'text-[#8C7361] hover:text-[#2C1B10]'}`}
+              onClick={() => setFilterTab('ALL')}
+              className={`px-3 xs:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer ${
+                filterTab === 'ALL'
+                  ? 'bg-[#2C1B10] text-white shadow-xs'
+                  : 'text-[#8C7361] hover:bg-[#FAF6F0] border border-[#EDE4D5]'
+              }`}
             >
-              All Batches ({batches.length})
+              All Batches ({allCount})
             </button>
             <button
-              onClick={() => setFilter('FLAGGED')}
-              className={`px-3 py-1 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 ${filter === 'FLAGGED' ? 'bg-rose-600 text-white shadow-xs' : 'text-rose-700 hover:text-rose-900'}`}
+              onClick={() => setFilterTab('TODAY')}
+              className={`px-3 xs:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+                filterTab === 'TODAY'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
+              }`}
             >
-              <AlertTriangle className="w-3 h-3" />
-              Under-Yield Only ({batches.filter((b) => b.isFlagged).length})
+              <span>📅 Today</span>
+              <span
+                className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                  filterTab === 'TODAY' ? 'bg-white text-emerald-800' : 'bg-emerald-600 text-white'
+                }`}
+              >
+                {todayCount}
+              </span>
+            </button>
+            <button
+              onClick={() => setFilterTab('FLAGGED')}
+              className={`px-3 xs:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+                filterTab === 'FLAGGED'
+                  ? 'bg-rose-700 text-white shadow-xs'
+                  : 'text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200'
+              }`}
+            >
+              <Flag className="w-3.5 h-3.5" />
+              <span>Under-Yield</span>
+              {flaggedCount > 0 && (
+                <span
+                  className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                    filterTab === 'FLAGGED' ? 'bg-white text-rose-800' : 'bg-rose-600 text-white'
+                  }`}
+                >
+                  {flaggedCount}
+                </span>
+              )}
             </button>
           </div>
         </div>
 
-        {/* Mobile Batch Cards (< md) */}
-        <div className="md:hidden p-3.5 space-y-3">
-          {isLoading ? (
-            <div className="py-8 text-center text-xs text-[#8C7361]">
-              <Loader2 className="w-5 h-5 animate-spin mx-auto text-[#E87A18] mb-2" />
-              Loading baking logs...
-            </div>
-          ) : displayedBatches.length === 0 ? (
-            <div className="py-8 text-center text-xs text-[#8C7361]">
-              No baking batches recorded for this filter.
-            </div>
-          ) : (
-            displayedBatches.map((batch) => {
-              const eff = Number(batch.yieldEfficiency);
-              return (
-                <div
-                  key={batch.id}
-                  className={`p-3.5 sm:p-4 rounded-2xl bg-[#FFFDF8] border shadow-xs space-y-3 overflow-hidden ${
-                    batch.isFlagged ? 'border-rose-300 bg-rose-50/20' : 'border-[#EDE4D5]'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono font-extrabold text-sm text-[#2C1B10] truncate">{batch.batchNumber}</span>
-                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#FAF7EE] text-[#4A2E1B] border border-[#EDE4D5]">
-                          {batch.shift}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[#8C7361] mt-0.5 truncate">
-                        {new Date(batch.createdAt).toLocaleString()} &bull; {batch.baker?.fullName || 'Master Baker'}
-                      </p>
-                    </div>
+        {/* Right Shift Selector */}
+        <div className="flex items-center bg-[#FAF6F0] p-1 rounded-xl border border-[#EDE4D5] shrink-0 self-start sm:self-auto max-w-full overflow-x-auto no-scrollbar">
+          <button
+            onClick={() => setShiftFilter('ALL')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              shiftFilter === 'ALL'
+                ? 'bg-[#4A2E1B] text-white shadow-xs'
+                : 'text-[#8C7361] hover:text-[#2C1B10]'
+            }`}
+          >
+            All Shifts
+          </button>
+          <button
+            onClick={() => setShiftFilter('DAY')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              shiftFilter === 'DAY'
+                ? 'bg-amber-500 text-zinc-950 shadow-xs'
+                : 'text-[#8C7361] hover:text-[#2C1B10]'
+            }`}
+          >
+            ☀️ Day Shift
+          </button>
+          <button
+            onClick={() => setShiftFilter('NIGHT')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              shiftFilter === 'NIGHT'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-[#8C7361] hover:text-[#2C1B10]'
+            }`}
+          >
+            🌙 Night Shift
+          </button>
+        </div>
+      </div>
 
-                    <div className="text-right shrink-0">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
-                          eff >= 90
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                            : 'bg-rose-50 text-rose-800 border-rose-200'
-                        }`}
-                      >
-                        {eff >= 90 ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <AlertTriangle className="w-3 h-3 text-rose-600" />}
-                        {eff}% Yield
+      {/* ── Mobile Card List (block on < md) ── */}
+      <div className="space-y-3 block md:hidden mb-6">
+        {isLoading ? (
+          <div className="py-10 text-center bg-white rounded-2xl border border-[#EDE4D5] text-[#8C7361] text-xs">
+            <Loader2 className="w-5 h-5 animate-spin mx-auto text-[#E87A18] mb-2" />
+            Loading baking logs...
+          </div>
+        ) : displayedBatches.length === 0 ? (
+          <div className="text-center py-10 bg-white rounded-2xl border border-[#EDE4D5] text-[#8C7361] font-medium text-xs">
+            {filterTab === 'FLAGGED'
+              ? 'No batches are flagged for under-yield.'
+              : filterTab === 'TODAY'
+              ? 'No batches recorded for today yet.'
+              : 'No baking batches recorded.'}
+          </div>
+        ) : (
+          displayedBatches.map((batch) => {
+            const batchDateYmd = (batch.createdAt || '').slice(0, 10);
+            const isToday = batchDateYmd === todayYmd;
+            const isYesterday = batchDateYmd === yesterdayYmd;
+            const eff = Number(batch.yieldEfficiency);
+
+            return (
+              <div
+                key={batch.id}
+                className={`bg-white rounded-2xl border p-3.5 xs:p-4 shadow-xs space-y-3 overflow-hidden ${
+                  batch.isFlagged
+                    ? 'border-rose-300 ring-1 ring-rose-100 bg-[#FFFDF8]'
+                    : 'border-[#EDE4D5]'
+                }`}
+              >
+                {/* Card Header: Ethiopian Date, Shift, Batch No, and Yield Status */}
+                <div className="flex items-start justify-between gap-2 border-b border-[#F4ECE1] pb-2.5">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-extrabold text-sm text-[#2C1B10]">
+                        {formatEthDate(batch.createdAt)}
+                      </span>
+                      {isToday && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                          Today
+                        </span>
+                      )}
+                      {isYesterday && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                          Yesterday
+                        </span>
+                      )}
+                      {batch.isFlagged && (
+                        <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-800 border border-rose-300">
+                          🚩 Under-Yield
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#8C7361]">
+                        {batch.shift === 'NIGHT' ? '🌙 Night Shift' : '☀️ Day Shift'}
+                      </span>
+                      <span className="text-[10px] font-mono text-[#8C7361]">&bull;</span>
+                      <span className="font-mono text-[11px] font-bold text-[#4A2E1B] bg-[#FAF7EE] px-1.5 py-0.2 rounded border border-[#EDE4D5]">
+                        {batch.batchNumber}
                       </span>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t border-[#EDE4D5]/60">
-                    <div className="p-2 bg-[#FAF7EE]/60 rounded-xl text-center">
-                      <span className="text-[10px] font-bold text-[#8C7361] uppercase tracking-wider block">Flour Used</span>
-                      <span className="font-mono font-bold text-xs text-[#4A2E1B]">{batch.flourSacksUsed} sacks</span>
-                      <span className="text-[10px] text-[#8C7361] block font-mono">({batch.flourWeightKg}kg)</span>
-                    </div>
-                    <div className="p-2 bg-[#FAF7EE]/60 rounded-xl text-center">
-                      <span className="text-[10px] font-bold text-[#8C7361] uppercase tracking-wider block">Expected</span>
-                      <span className="font-mono font-bold text-xs text-[#8C7361]">{batch.expectedLoaves.toLocaleString()}</span>
-                      <span className="text-[10px] text-[#8C7361] block">loaves</span>
-                    </div>
-                    <div className="p-2 bg-[#FAF7EE]/60 rounded-xl text-center">
-                      <span className="text-[10px] font-bold text-[#8C7361] uppercase tracking-wider block">Actual Baked</span>
-                      <span className="font-mono font-extrabold text-xs text-[#2C1B10]">{batch.actualLoavesBaked.toLocaleString()}</span>
-                      {batch.damagedLoaves > 0 && (
-                        <span className="text-[10px] text-rose-700 font-semibold block">-{batch.damagedLoaves} dmg</span>
+                  {/* Yield Status Pill */}
+                  <div className="shrink-0 text-right">
+                    <span
+                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                        eff >= 90
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          : 'bg-rose-50 text-rose-800 border-rose-200'
+                      }`}
+                    >
+                      {eff >= 90 ? (
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      ) : (
+                        <AlertTriangle className="w-3 h-3 text-rose-600" />
                       )}
+                      {eff}% Yield
+                    </span>
+                  </div>
+                </div>
+
+                {/* Collapsible Flagged Clarification Notice */}
+                {batch.isFlagged && batch.flagReason && (
+                  <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-950 text-xs flex items-start gap-2">
+                    <span className="text-sm shrink-0">🚩</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[10px] uppercase font-bold text-rose-600 mb-0.5">
+                        Supervisor Explanation:
+                      </div>
+                      <p className="font-semibold text-rose-900 leading-relaxed whitespace-pre-wrap">
+                        {batch.flagReason}
+                      </p>
                     </div>
                   </div>
+                )}
 
-                  {batch.isFlagged && batch.flagReason && (
-                    <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                      <span className="italic">{batch.flagReason}</span>
-                    </div>
-                  )}
+                {/* Products Baked */}
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#8C7361] block mb-1">
+                    Products Baked
+                  </span>
+                  <div className="inline-flex max-w-full items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#FAF6F0] border border-[#EDE4D5] text-xs font-bold text-[#2C1B10]">
+                    <span className="truncate">{batch.product?.name || 'Standard Loaf 50g'}</span>
+                    <span className="text-[#E87A18] font-black shrink-0">
+                      &times; {Number(batch.actualLoavesBaked).toLocaleString()} Loaves
+                    </span>
+                  </div>
                 </div>
-              );
-            })
-          )}
-        </div>
 
-        {/* Desktop Table (>= md) */}
-        <div className="hidden md:block overflow-x-auto">
+                {/* Raw Materials Deducted */}
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#8C7361] block mb-1">
+                    Raw Materials Consumed
+                  </span>
+                  <div className="inline-flex max-w-full items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-50 border border-rose-100 text-xs font-semibold text-rose-800">
+                    <span className="truncate">🌾 Wheat Flour:</span>
+                    <span className="font-extrabold shrink-0">
+                      -{Number(batch.flourSacksUsed).toFixed(2)} sacks ({Number(batch.flourWeightKg).toFixed(1)} kg)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Yield Physics Variance Grid */}
+                <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t border-[#F4ECE1]">
+                  <div className="p-2 bg-[#FAF7EE]/60 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-[#8C7361] uppercase tracking-wider block">
+                      Flour Used
+                    </span>
+                    <span className="font-mono font-bold text-xs text-[#4A2E1B]">
+                      {batch.flourSacksUsed} sacks
+                    </span>
+                    <span className="text-[10px] text-[#8C7361] block font-mono">
+                      ({batch.flourWeightKg}kg)
+                    </span>
+                  </div>
+                  <div className="p-2 bg-[#FAF7EE]/60 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-[#8C7361] uppercase tracking-wider block">
+                      Expected
+                    </span>
+                    <span className="font-mono font-bold text-xs text-[#8C7361]">
+                      {Number(batch.expectedLoaves).toLocaleString()}
+                    </span>
+                    <span className="text-[10px] text-[#8C7361] block">loaves</span>
+                  </div>
+                  <div className="p-2 bg-[#FAF7EE]/60 rounded-xl text-center">
+                    <span className="text-[10px] font-bold text-[#8C7361] uppercase tracking-wider block">
+                      Actual Baked
+                    </span>
+                    <span className="font-mono font-extrabold text-xs text-[#2C1B10]">
+                      {Number(batch.actualLoavesBaked).toLocaleString()}
+                    </span>
+                    {batch.damagedLoaves > 0 && (
+                      <span className="text-[10px] text-rose-700 font-semibold block">
+                        -{batch.damagedLoaves} dmg
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Card Footer: Prominent Baker Identity (Fixed for Small Phones!) ── */}
+                <div className="pt-2.5 border-t border-[#F4ECE1] flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className="w-8 h-8 rounded-full bg-[#FAF7EE] border border-[#EDE4D5] flex items-center justify-center shrink-0 text-sm shadow-2xs">
+                      👨‍🍳
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#8C7361] block leading-none mb-0.5">
+                        Logged by
+                      </span>
+                      <span className="text-xs font-black text-[#2C1B10] block break-words">
+                        {batch.baker?.fullName || 'Master Baker'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <span className="text-[10px] font-mono text-[#8C7361] font-bold bg-[#FAF7EE] px-2 py-0.5 rounded-md border border-[#EDE4D5]">
+                      {new Date(batch.createdAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* ── Desktop Table (hidden on < md, visible on md+) ── */}
+      <div className="hidden md:block border border-[#EDE4D5] bg-white rounded-3xl shadow-2xs overflow-hidden">
+        <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-[#FAF7EE] text-[#8C7361] font-bold uppercase tracking-wider text-[11px] border-b border-[#EDE4D5]">
               <tr>
-                <th className="py-3.5 px-4">Batch Number</th>
-                <th className="py-3.5 px-4">Shift &amp; Baker</th>
-                <th className="py-3.5 px-4 text-right">Flour Used</th>
-                <th className="py-3.5 px-4 text-right">Expected Loaves</th>
-                <th className="py-3.5 px-4 text-right">Actual Baked</th>
+                <th className="py-3.5 px-4 w-44">Date &amp; Shift</th>
+                <th className="py-3.5 px-4">Products Baked</th>
+                <th className="py-3.5 px-4">Raw Materials Consumed</th>
+                <th className="py-3.5 px-4 w-36">Logged By</th>
+                <th className="py-3.5 px-4 text-right">Expected vs Actual</th>
                 <th className="py-3.5 px-4 text-right">Yield Efficiency</th>
-                <th className="py-3.5 px-4 text-center">Status</th>
+                <th className="py-3.5 px-4 text-center w-36">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#EDE4D5]/60 text-[#2C1B10]">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-xs text-[#8C7361]">
+                  <td colSpan={7} className="py-10 text-center text-xs text-[#8C7361]">
                     <Loader2 className="w-5 h-5 animate-spin mx-auto text-[#E87A18] mb-2" />
                     Loading baking logs...
                   </td>
                 </tr>
               ) : displayedBatches.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-xs text-[#8C7361]">
-                    No baking batches recorded for this filter.
+                  <td colSpan={7} className="py-10 text-center text-xs text-[#8C7361]">
+                    {filterTab === 'FLAGGED'
+                      ? 'No batches are flagged for under-yield.'
+                      : filterTab === 'TODAY'
+                      ? 'No batches recorded for today yet.'
+                      : 'No baking batches recorded for this filter.'}
                   </td>
                 </tr>
               ) : (
                 displayedBatches.map((batch) => {
+                  const batchDateYmd = (batch.createdAt || '').slice(0, 10);
+                  const isToday = batchDateYmd === todayYmd;
+                  const isYesterday = batchDateYmd === yesterdayYmd;
                   const eff = Number(batch.yieldEfficiency);
+
                   return (
-                    <tr key={batch.id} className="hover:bg-[#FAF7EE]/50 transition-colors">
-                      <td className="py-3.5 px-4 font-mono font-extrabold text-sm text-[#2C1B10]">
-                        {batch.batchNumber}
-                        <div className="text-[11px] font-normal text-[#8C7361]">
-                          {new Date(batch.createdAt).toLocaleString()}
+                    <tr key={batch.id} className="hover:bg-[#FAF8F5]/80 transition-colors">
+                      {/* Date & Shift */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-extrabold text-sm text-[#2C1B10]">
+                            {formatEthDate(batch.createdAt)}
+                          </span>
+                          {isToday && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                              Today
+                            </span>
+                          )}
+                          {isYesterday && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-600" />
+                              Yesterday
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 text-xs font-semibold text-[#8C7361] mt-0.5">
+                          <span>{batch.shift === 'NIGHT' ? '🌙 Night Shift' : '☀️ Day Shift'}</span>
+                          <span>&bull;</span>
+                          <span className="font-mono text-[11px] text-[#4A2E1B]">
+                            {batch.batchNumber}
+                          </span>
                         </div>
                       </td>
 
+                      {/* Products Baked */}
                       <td className="py-3.5 px-4">
-                        <div className="font-bold text-[#2C1B10]">{batch.baker?.fullName || 'Master Baker'}</div>
-                        <span className="inline-block mt-0.5 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#FAF7EE] text-[#4A2E1B] border border-[#EDE4D5]">
-                          {batch.shift} SHIFT
+                        <div className="font-bold text-[#2C1B10] text-sm">
+                          {batch.product?.name || 'Standard Loaf 50g'}
+                          <span className="font-extrabold text-[#E87A18] ml-1">
+                            &times; {Number(batch.actualLoavesBaked).toLocaleString()} Loaves
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* Raw Materials Consumed */}
+                      <td className="py-3.5 px-4">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-50 border border-rose-100 text-xs font-semibold text-rose-800">
+                          <span>🌾 Wheat Flour:</span>
+                          <span className="font-extrabold">
+                            -{Number(batch.flourSacksUsed).toFixed(2)} sacks ({Number(batch.flourWeightKg).toFixed(1)} kg)
+                          </span>
                         </span>
                       </td>
 
-                      <td className="py-3.5 px-4 text-right font-mono font-bold text-sm text-[#4A2E1B]">
-                        {batch.flourSacksUsed} <span className="text-xs text-[#8C7361]">sacks</span>
-                        <div className="text-[11px] text-[#8C7361]">({batch.flourWeightKg} kg)</div>
+                      {/* Logged by */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm">👨‍🍳</span>
+                          <div>
+                            <div className="font-extrabold text-[#2C1B10]">
+                              {batch.baker?.fullName || 'Master Baker'}
+                            </div>
+                            <div className="text-[10px] text-[#8C7361]">Role: Baker</div>
+                          </div>
+                        </div>
                       </td>
 
-                      <td className="py-3.5 px-4 text-right font-mono text-[#8C7361]">
-                        {batch.expectedLoaves.toLocaleString()}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right font-mono font-extrabold text-sm text-[#2C1B10]">
-                        {batch.actualLoavesBaked.toLocaleString()}
+                      {/* Expected vs Actual */}
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="font-mono font-extrabold text-sm text-[#2C1B10]">
+                          {Number(batch.actualLoavesBaked).toLocaleString()} / {Number(batch.expectedLoaves).toLocaleString()}
+                        </div>
+                        <div className="text-[11px] text-[#8C7361]">
+                          Standard: 1,362 / sack
+                        </div>
                         {batch.damagedLoaves > 0 && (
                           <div className="text-[11px] text-rose-700 font-semibold">
                             -{batch.damagedLoaves} damaged
@@ -431,12 +718,21 @@ export default function ProductionPage() {
                         )}
                       </td>
 
-                      <td className="py-3.5 px-4 text-right font-mono font-extrabold text-sm">
-                        <span className={eff >= 90 ? 'text-emerald-700' : 'text-rose-700'}>
-                          {batch.yieldEfficiency}%
+                      {/* Yield Efficiency */}
+                      <td className="py-3.5 px-4 text-right">
+                        <span
+                          className={`font-mono font-extrabold text-sm ${
+                            eff >= 90 ? 'text-emerald-700' : 'text-rose-700 font-black'
+                          }`}
+                        >
+                          {eff}%
                         </span>
+                        <div className="text-[10px] text-[#8C7361]">
+                          {eff >= 90 ? 'Within tolerance' : 'Below 90% threshold'}
+                        </div>
                       </td>
 
+                      {/* Status */}
                       <td className="py-3.5 px-4 text-center">
                         {batch.isFlagged ? (
                           <div className="inline-flex flex-col items-center">
@@ -445,7 +741,10 @@ export default function ProductionPage() {
                               Under-Yield Alert
                             </span>
                             {batch.flagReason && (
-                              <span className="text-[10px] text-rose-700 italic mt-0.5 max-w-[180px] truncate" title={batch.flagReason}>
+                              <span
+                                className="text-[10px] text-rose-700 italic mt-0.5 max-w-[160px] truncate"
+                                title={batch.flagReason}
+                              >
                                 {batch.flagReason}
                               </span>
                             )}
@@ -453,7 +752,7 @@ export default function ProductionPage() {
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-800 border border-emerald-200">
                             <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            Optimal
+                            Optimal Yield
                           </span>
                         )}
                       </td>
@@ -477,7 +776,7 @@ export default function ProductionPage() {
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-[#8C7361] hover:text-[#4A2E1B] p-1 transition-colors"
+                className="text-[#8C7361] hover:text-[#4A2E1B] p-1 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -539,7 +838,11 @@ export default function ProductionPage() {
 
                 <div className="flex items-center justify-between text-xs font-extrabold pt-1 border-t border-[#EDE4D5]/80">
                   <span className="text-[#4A2E1B]">Calculated Efficiency:</span>
-                  <span className={`font-mono text-sm ${efficiencyCalculated >= 90 ? 'text-emerald-700' : 'text-rose-700 font-black'}`}>
+                  <span
+                    className={`font-mono text-sm ${
+                      efficiencyCalculated >= 90 ? 'text-emerald-700' : 'text-rose-700 font-black'
+                    }`}
+                  >
                     {efficiencyCalculated}%
                   </span>
                 </div>
@@ -604,14 +907,14 @@ export default function ProductionPage() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="flex-1 py-2.5 border border-[#EDE4D5] bg-white text-[#4A2E1B] font-bold rounded-xl text-xs cursor-pointer"
+                  className="flex-1 py-2.5 border border-[#EDE4D5] bg-white text-[#4A2E1B] font-bold rounded-xl text-xs cursor-pointer hover:bg-[#FAF7EE] transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex-1 py-2.5 bg-[#E87A18] hover:bg-[#D96B10] text-white font-bold rounded-xl text-xs shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="flex-1 py-2.5 bg-[#E87A18] hover:bg-[#D96B10] text-white font-bold rounded-xl text-xs shadow-md disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
                 >
                   {isSubmitting ? (
                     <>
