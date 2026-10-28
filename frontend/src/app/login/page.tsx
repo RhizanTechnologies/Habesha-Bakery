@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../context/AuthContext';
 import { apiRequest } from '../../lib/api';
+import LanguageSelector from '../../components/LanguageSelector';
 import { Smartphone, Lock, ShieldCheck, Eye, EyeOff, Store, X, KeyRound, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
@@ -87,6 +88,11 @@ export default function LoginPage() {
 
   return (
     <div className="fixed inset-0 z-50 bg-[#FAF7EE] flex items-center justify-center p-4">
+      {/* Floating Language Selector at top-right */}
+      <div className="absolute top-2.5 right-2.5 xs:top-4 xs:right-4 sm:top-6 sm:right-6 z-20">
+        <LanguageSelector variant="header" />
+      </div>
+
       <div className="w-full max-w-md bg-[#FFFDF8] rounded-3xl shadow-xl border border-[#EDE4D5] p-8 sm:p-10">
         {/* Brand Header */}
         <div className="text-center mb-8">
