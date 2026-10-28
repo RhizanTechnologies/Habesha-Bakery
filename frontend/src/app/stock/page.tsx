@@ -350,7 +350,77 @@ export default function StockPage() {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile Inventory Cards (< md) */}
+        <div className="md:hidden p-3.5 space-y-3">
+          {isLoading ? (
+            <div className="py-8 text-center text-xs text-[#8C7361]">
+              <Loader2 className="w-5 h-5 animate-spin mx-auto text-[#E87A18] mb-2" />
+              Loading warehouse stock...
+            </div>
+          ) : stocks.length === 0 ? (
+            <div className="py-8 text-center text-xs text-[#8C7361]">
+              No raw materials registered in warehouse.
+            </div>
+          ) : (
+            stocks.map((item) => (
+              <div key={item.id} className="p-4 rounded-2xl bg-[#FFFDF8] border border-[#EDE4D5] shadow-xs space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-[#FAF7EE] border border-[#EDE4D5] flex items-center justify-center text-[#E87A18] shrink-0">
+                      <Wheat className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-sm text-[#2C1B10]">{item.name}</h4>
+                      <p className="font-mono text-[11px] text-[#8C7361]">{item.sku}</p>
+                    </div>
+                  </div>
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border shrink-0 ${
+                      item.isLowStock
+                        ? 'bg-rose-50 text-rose-800 border-rose-200'
+                        : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    }`}
+                  >
+                    {item.isLowStock ? (
+                      <>
+                        <AlertTriangle className="w-3 h-3 text-rose-600" />
+                        Low Stock
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        Healthy
+                      </>
+                    )}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-[#EDE4D5]/60">
+                  <div className="p-2.5 bg-[#FAF7EE]/60 rounded-xl">
+                    <span className="text-[10px] font-bold text-[#8C7361] uppercase tracking-wider block">Warehouse Balance</span>
+                    <span className="font-mono font-extrabold text-sm text-[#2C1B10]">
+                      {item.currentQuantity} <span className="text-xs text-[#8C7361] font-semibold">{item.unit}</span>
+                    </span>
+                  </div>
+                  <div className="p-2.5 bg-[#FAF7EE]/60 rounded-xl">
+                    <span className="text-[10px] font-bold text-[#8C7361] uppercase tracking-wider block">Min Threshold</span>
+                    <span className="font-mono font-bold text-sm text-[#8C7361]">
+                      {item.minStockThreshold} {item.unit}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-[#8C7361] font-medium flex items-center justify-between">
+                  <span>Packaging Unit:</span>
+                  <span className="font-semibold text-[#4A2E1B]">{item.packageWeightKg ? `${item.packageWeightKg} kg / ${item.unit}` : item.unit}</span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop Table (>= md) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-[#FAF7EE] text-[#8C7361] font-bold uppercase tracking-wider text-[11px] border-b border-[#EDE4D5]">
               <tr>

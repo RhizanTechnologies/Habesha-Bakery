@@ -393,8 +393,130 @@ export default function TransfersPage() {
             <p className="text-[11px] text-[#8C7361] mt-0.5">Click &quot;Dispatch New Crates&quot; to send bread from Central Hub.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+          <div>
+            {/* Mobile Manifest Cards (< md) */}
+            <div className="md:hidden p-3.5 space-y-3">
+              {filteredManifests.map((manifest) => (
+                <div key={manifest.id} className="p-4 rounded-2xl bg-[#FFFDF8] border border-[#EDE4D5] shadow-xs space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="font-mono font-bold text-sm text-[#2C1B10] block">{manifest.manifestNumber}</span>
+                      <span className="text-[10px] text-[#8C7361]">
+                        {new Date(manifest.createdAt).toLocaleDateString()} &bull; {new Date(manifest.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+
+                    <div className="shrink-0">
+                      {manifest.status === 'PENDING_DISPATCH' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                          <Clock className="w-3 h-3" />
+                          Pending Dispatch
+                        </span>
+                      )}
+                      {manifest.status === 'IN_TRANSIT' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-sky-50 text-sky-800 border border-sky-200 animate-pulse">
+                          <Truck className="w-3 h-3" />
+                          In Transit
+                        </span>
+                      )}
+                      {manifest.status === 'RECEIVED' && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                          <CheckCircle2 className="w-3 h-3" />
+                          Stocked
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-[#FAF7EE]/60 rounded-xl space-y-1.5 text-xs">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <span className="text-[#E87A18]">{manifest.sourceBranch.name}</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-[#8C7361] shrink-0" />
+                      <span className="text-[#2C1B10]">{manifest.destinationBranch.name}</span>
+                    </div>
+                    <div className="text-[11px] text-[#8C7361]">
+                      {manifest.product.name}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-[#EDE4D5]/60">
+                    <div className="p-2.5 bg-[#FAF7EE]/40 rounded-xl">
+                      <span className="text-[10px] font-bold text-[#8C7361] uppercase tracking-wider block">Quantity</span>
+                      <span className="font-extrabold text-sm text-[#2C1B10] block">{manifest.dispatchedLoaves.toLocaleString()} Loaves</span>
+                      <span className="text-[11px] text-[#E87A18] font-bold flex items-center gap-1 mt-0.5">
+                        <Package className="w-3 h-3" />
+                        {manifest.crateCount} Crates
+                      </span>
+                    </div>
+
+                    <div className="p-2.5 bg-[#FAF7EE]/40 rounded-xl">
+                      <span className="text-[10px] font-bold text-[#8C7361] uppercase tracking-wider block">Driver</span>
+                      <span className="font-bold text-xs text-[#2C1B10] block truncate">{manifest.driver.fullName}</span>
+                      <span className="text-[11px] text-[#8C7361] font-mono block mt-0.5">{manifest.driver.phone}</span>
+                    </div>
+                  </div>
+
+                  {manifest.status === 'RECEIVED' && (
+                    <div className="p-2.5 rounded-xl bg-[#FAF7EE]/80 border border-[#EDE4D5] text-xs flex items-center justify-between">
+                      <span className="text-[11px] text-[#8C7361] font-medium">Arrival Audit:</span>
+                      {manifest.crushedLoaves && manifest.crushedLoaves > 0 ? (
+                        <div className="text-right">
+                          <span className="text-rose-700 font-bold block">{manifest.crushedLoaves} Crushed</span>
+                          <span className="text-[10px] text-rose-600 font-semibold">Billed ETB {Number(manifest.driverBilledCost).toFixed(2)}</span>
+                        </div>
+                      ) : (
+                        <span className="font-bold text-emerald-700 flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> 0 Damages (100% Intact)
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="pt-1">
+                    {manifest.status === 'PENDING_DISPATCH' && (
+                      <button
+                        onClick={() => handleDispatchHandshake(manifest.id)}
+                        disabled={submitting}
+                        className="w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer text-xs"
+                      >
+                        <Truck className="w-4 h-4" />
+                        Driver Sign &amp; Dispatch
+                      </button>
+                    )}
+
+                    {manifest.status === 'IN_TRANSIT' && (
+                      <button
+                        onClick={() => {
+                          setSelectedManifestForReceive(manifest);
+                          setCrushedLoaves('0');
+                          setSupervisorPin('');
+                        }}
+                        disabled={submitting}
+                        className="w-full py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer text-xs"
+                      >
+                        <ShieldCheck className="w-4 h-4" />
+                        Spoke Arrival Handshake
+                      </button>
+                    )}
+
+                    {manifest.status === 'RECEIVED' && (
+                      <div className="p-2 bg-emerald-50 rounded-xl border border-emerald-200 text-center">
+                        <span className="text-emerald-800 font-bold text-xs">+{manifest.receivedLoaves} Loaves Stocked to Shelf</span>
+                        {manifest.receivedByUser && (
+                          <div className="text-[10px] text-emerald-700 mt-0.5">
+                            Verified by {manifest.receivedByUser.fullName}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table (>= md) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
               <thead className="bg-[#FAF7EE] text-[#8C7361] uppercase font-black text-[10px] tracking-wider border-b border-[#EDE4D5]">
                 <tr>
                   <th className="py-3 px-4">Manifest #</th>
@@ -531,8 +653,9 @@ export default function TransfersPage() {
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+    </div>
 
       {/* ── Modal 1: Create Transfer Manifest ── */}
       {isCreateOpen && (

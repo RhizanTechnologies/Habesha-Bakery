@@ -10,6 +10,7 @@ import {
   MapPin,
   Users,
   Check,
+  CheckCircle2,
   RefreshCw,
   Search,
   Edit2,
@@ -397,7 +398,84 @@ export default function BranchesPage() {
       ) : (
         /* Table View */
         <div className="bg-[#FFFDF8] rounded-2xl border border-[#EDE4D5] overflow-hidden shadow-2xs">
-          <div className="overflow-x-auto">
+          {/* Mobile Branch Cards (< md) */}
+          <div className="md:hidden p-3.5 space-y-3">
+            {filteredBranches.map((b) => {
+              const isActiveContext = activeBranch?.id === b.id;
+              return (
+                <div key={b.id} className="p-4 rounded-2xl bg-[#FFFDF8] border border-[#EDE4D5] shadow-xs space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-[#FAF7EE] border border-[#EDE4D5] flex items-center justify-center shrink-0">
+                        {b.isHub ? <Building2 className="w-5 h-5 text-teal-700" /> : <Store className="w-5 h-5 text-[#E87A18]" />}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-extrabold text-sm text-[#2C1B10]">{b.name}</span>
+                          {isActiveContext && (
+                            <span className="px-1.5 py-0.5 text-[9px] font-black bg-teal-100 text-teal-800 rounded">ACTIVE</span>
+                          )}
+                        </div>
+                        <span className="font-mono text-[11px] text-[#8C7361]">{b.code}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0">
+                      {b.isHub ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                          Hub
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#F4ECE1] text-[#4A2E1B] border border-[#EDE4D5]">
+                          Spoke
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-[#EDE4D5]/60">
+                    <div className="p-2 bg-[#FAF7EE]/40 rounded-xl">
+                      <span className="text-[10px] font-bold text-[#8C7361] uppercase tracking-wider block">Address</span>
+                      <span className="font-medium text-xs text-[#2C1B10] block truncate">{b.address || '—'}</span>
+                    </div>
+
+                    <div className="p-2 bg-[#FAF7EE]/40 rounded-xl">
+                      <span className="text-[10px] font-bold text-[#8C7361] uppercase tracking-wider block">Assigned Staff</span>
+                      <span className="font-bold text-xs text-[#2C1B10] block">{b._count?.users ?? 0} Personnel</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-[#EDE4D5]/60">
+                    {!isActiveContext ? (
+                      <button
+                        onClick={() => switchBranch(b.id)}
+                        className="px-3 py-1.5 rounded-xl bg-[#E87A18] text-white font-bold text-xs hover:bg-[#D96B10] transition-colors"
+                      >
+                        Select Branch
+                      </button>
+                    ) : (
+                      <span className="text-xs font-bold text-teal-700 flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Current Context
+                      </span>
+                    )}
+
+                    {isOwnerOrAdmin && (
+                      <button
+                        onClick={() => openEditModal(b)}
+                        className="p-1.5 rounded-xl border border-[#EDE4D5] text-[#8C7361] hover:text-[#2C1B10] hover:bg-[#FAF7EE] text-xs font-bold flex items-center gap-1"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                        <span>Edit</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop Table (>= md) */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-[#FAF7EE] border-b border-[#EDE4D5] text-[#8C7361] uppercase font-black tracking-wider text-[10px]">
                 <tr>

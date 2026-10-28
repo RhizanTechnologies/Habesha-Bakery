@@ -286,7 +286,88 @@ export default function ProductionPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile Batch Cards (< md) */}
+        <div className="md:hidden p-3.5 space-y-3">
+          {isLoading ? (
+            <div className="py-8 text-center text-xs text-[#8C7361]">
+              <Loader2 className="w-5 h-5 animate-spin mx-auto text-[#E87A18] mb-2" />
+              Loading baking logs...
+            </div>
+          ) : displayedBatches.length === 0 ? (
+            <div className="py-8 text-center text-xs text-[#8C7361]">
+              No baking batches recorded for this filter.
+            </div>
+          ) : (
+            displayedBatches.map((batch) => {
+              const eff = Number(batch.yieldEfficiency);
+              return (
+                <div
+                  key={batch.id}
+                  className={`p-4 rounded-2xl bg-[#FFFDF8] border shadow-xs space-y-3 ${
+                    batch.isFlagged ? 'border-rose-300 bg-rose-50/20' : 'border-[#EDE4D5]'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-extrabold text-sm text-[#2C1B10]">{batch.batchNumber}</span>
+                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-[#FAF7EE] text-[#4A2E1B] border border-[#EDE4D5]">
+                          {batch.shift}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#8C7361] mt-0.5">
+                        {new Date(batch.createdAt).toLocaleString()} &bull; {batch.baker?.fullName || 'Master Baker'}
+                      </p>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                          eff >= 90
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : 'bg-rose-50 text-rose-800 border-rose-200'
+                        }`}
+                      >
+                        {eff >= 90 ? <CheckCircle2 className="w-3 h-3 text-emerald-600" /> : <AlertTriangle className="w-3 h-3 text-rose-600" />}
+                        {eff}% Yield
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-xs pt-1 border-t border-[#EDE4D5]/60">
+                    <div className="p-2 bg-[#FAF7EE]/60 rounded-xl text-center">
+                      <span className="text-[10px] font-bold text-[#8C7361] uppercase tracking-wider block">Flour Used</span>
+                      <span className="font-mono font-bold text-xs text-[#4A2E1B]">{batch.flourSacksUsed} sacks</span>
+                      <span className="text-[10px] text-[#8C7361] block font-mono">({batch.flourWeightKg}kg)</span>
+                    </div>
+                    <div className="p-2 bg-[#FAF7EE]/60 rounded-xl text-center">
+                      <span className="text-[10px] font-bold text-[#8C7361] uppercase tracking-wider block">Expected</span>
+                      <span className="font-mono font-bold text-xs text-[#8C7361]">{batch.expectedLoaves.toLocaleString()}</span>
+                      <span className="text-[10px] text-[#8C7361] block">loaves</span>
+                    </div>
+                    <div className="p-2 bg-[#FAF7EE]/60 rounded-xl text-center">
+                      <span className="text-[10px] font-bold text-[#8C7361] uppercase tracking-wider block">Actual Baked</span>
+                      <span className="font-mono font-extrabold text-xs text-[#2C1B10]">{batch.actualLoavesBaked.toLocaleString()}</span>
+                      {batch.damagedLoaves > 0 && (
+                        <span className="text-[10px] text-rose-700 font-semibold block">-{batch.damagedLoaves} dmg</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {batch.isFlagged && batch.flagReason && (
+                    <div className="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                      <span className="italic">{batch.flagReason}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop Table (>= md) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-[#FAF7EE] text-[#8C7361] font-bold uppercase tracking-wider text-[11px] border-b border-[#EDE4D5]">
               <tr>

@@ -452,7 +452,145 @@ export default function UsersPage() {
             </div>
           ) : (
             <div className="bg-[#FFFDF8] rounded-2xl border border-[#EDE4D5] overflow-hidden shadow-2xs">
-              <div className="overflow-x-auto">
+              {/* Mobile Staff Cards (< md) */}
+              <div className="md:hidden p-3.5 space-y-3">
+                {filteredUsers.map((u) => {
+                  const avatarSrc = getFileUrl(u.avatarUrl);
+                  const docSrc = getFileUrl(u.filesUrl);
+
+                  return (
+                    <div key={u.id} className="p-4 rounded-2xl bg-[#FFFDF8] border border-[#EDE4D5] shadow-xs space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          {avatarSrc ? (
+                            <img
+                              src={avatarSrc}
+                              alt={u.fullName}
+                              className="w-10 h-10 rounded-full object-cover border border-[#EDE4D5] shrink-0"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#4A2E1B] to-[#E87A18] text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-2xs">
+                              {u.fullName.charAt(0)}
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="font-extrabold text-sm text-[#2C1B10] truncate">{u.fullName}</p>
+                            <span className="text-[10px] text-[#8C7361]">
+                              Joined {new Date(u.createdAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {u.isActive ? (
+                            <span className="inline-flex items-center text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                              Active
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                              Inactive
+                            </span>
+                          )}
+
+                          {/* Quick Actions */}
+                          <div className="flex items-center gap-0.5 border border-[#EDE4D5] rounded-xl p-0.5 bg-[#FAF7EE]/60">
+                            <button
+                              onClick={() => {
+                                setPasswordModalUser(u);
+                                setNewPassword('');
+                                setError(null);
+                              }}
+                              className="p-1 rounded-lg text-[#8C7361] hover:text-[#E87A18] hover:bg-white"
+                              title="Reset Password"
+                            >
+                              <KeyRound className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => openEditModal(u)}
+                              className="p-1 rounded-lg text-[#8C7361] hover:text-[#2C1B10] hover:bg-white"
+                              title="Edit Staff"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            {isOwnerOrAdmin && u.id !== currentUser?.id && (
+                              <button
+                                onClick={() => handleToggleActive(u)}
+                                className={`p-1 rounded-lg ${
+                                  u.isActive ? 'text-[#8C7361] hover:text-red-600' : 'text-emerald-600'
+                                }`}
+                                title={u.isActive ? 'Deactivate' : 'Reactivate'}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[#EDE4D5]/60 text-xs">
+                        <div>{getRoleBadge(u.role)}</div>
+
+                        <div className="flex items-center gap-1 text-[#2C1B10] font-semibold text-[11px] bg-[#FAF7EE] px-2 py-1 rounded-lg border border-[#EDE4D5]/80">
+                          {u.branch ? (
+                            <>
+                              {u.branch.isHub ? (
+                                <Building2 className="w-3 h-3 text-teal-700 shrink-0" />
+                              ) : (
+                                <Building2 className="w-3 h-3 text-[#E87A18] shrink-0" />
+                              )}
+                              <span>{u.branch.name}</span>
+                            </>
+                          ) : (
+                            <span className="text-[#8C7361] italic">HQ / All Branches</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-[#EDE4D5]/60">
+                        <div className="p-2 bg-[#FAF7EE]/40 rounded-xl">
+                          <span className="text-[10px] font-bold text-[#8C7361] uppercase tracking-wider block">Phone (Login)</span>
+                          <span className="font-mono font-bold text-xs text-[#2C1B10] flex items-center gap-1 mt-0.5">
+                            <Phone className="w-3 h-3 text-[#8C7361]" />
+                            {u.phone}
+                          </span>
+                        </div>
+
+                        <div className="p-2 bg-[#FAF7EE]/40 rounded-xl">
+                          <span className="text-[10px] font-bold text-[#8C7361] uppercase tracking-wider block">Shift &amp; Salary</span>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            {u.shift && (
+                              <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-[#F4ECE1] text-[#4A2E1B] uppercase">
+                                {u.shift}
+                              </span>
+                            )}
+                            <span className="font-bold text-xs text-[#2C1B10]">
+                              {u.salary ? `${Number(u.salary).toLocaleString()} ETB` : '—'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {docSrc && (
+                        <div className="pt-1">
+                          <a
+                            href={docSrc}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-blue-600" />
+                            <span>View ID Document</span>
+                            <ExternalLink className="w-3 h-3 text-blue-400" />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table (>= md) */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-[#FAF7EE] border-b border-[#EDE4D5] text-[#8C7361] uppercase font-black tracking-wider text-[10px]">
                     <tr>
