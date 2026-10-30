@@ -241,8 +241,8 @@ export default function ProductsPage() {
       )}
 
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-amber-700 via-amber-600 to-amber-800 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-white/5 transform skew-x-12 pointer-events-none" />
+      <div className="bg-gradient-to-r from-[#4A2E1B] via-[#5A3A23] to-[#E87A18] rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-[#FFFDF8]/5 transform skew-x-12 pointer-events-none" />
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/30 backdrop-blur-sm border border-amber-400/30 text-amber-100 text-xs font-semibold mb-3">
@@ -261,7 +261,7 @@ export default function ProductsPage() {
           <div className="flex flex-wrap items-center gap-2.5">
             <button
               onClick={fetchData}
-              className="p-2.5 rounded-xl bg-amber-800/60 hover:bg-amber-800 border border-amber-500/30 text-amber-100 transition shadow-sm"
+              className="p-2.5 rounded-xl bg-[#4A2E1B]/60 hover:bg-[#4A2E1B] border border-amber-500/30 text-amber-100 transition shadow-sm"
               title="Refresh Catalog"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -271,16 +271,16 @@ export default function ProductsPage() {
               <>
                 <button
                   onClick={() => setShowCategoryModal(true)}
-                  className="px-3.5 py-2.5 rounded-xl bg-amber-800/60 hover:bg-amber-800 border border-amber-500/30 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+                  className="px-3.5 py-2.5 rounded-xl bg-[#4A2E1B]/60 hover:bg-[#4A2E1B] border border-amber-500/30 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
                 >
                   <Layers className="w-4 h-4" />
                   <span>+ Category</span>
                 </button>
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="px-4 py-2.5 rounded-xl bg-white text-amber-900 hover:bg-amber-50 text-xs font-bold transition flex items-center gap-2 shadow-md hover:shadow-lg active:scale-95"
+                  className="px-4 py-2.5 rounded-xl bg-[#FFFDF8] text-[#4A2E1B] hover:bg-amber-50 text-xs font-bold transition flex items-center gap-2 shadow-md hover:shadow-lg active:scale-95"
                 >
-                  <Plus className="w-4 h-4 text-amber-700" />
+                  <Plus className="w-4 h-4 text-[#E87A18]" />
                   <span>New Product</span>
                 </button>
               </>
@@ -318,15 +318,15 @@ export default function ProductsPage() {
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+      <div className="bg-[#FFFDF8] rounded-2xl p-4 border border-[#EDE4D5] shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8C7361]" />
           <input
             type="text"
             placeholder="Search by product name or SKU..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition text-slate-800 placeholder-slate-400"
+            className="w-full pl-10 pr-4 py-2 text-sm rounded-xl border border-[#EDE4D5] focus:outline-none focus:ring-2 focus:ring-[#E87A18] focus:border-amber-500 transition text-[#2C1B10] placeholder-slate-400"
           />
         </div>
 
@@ -335,7 +335,7 @@ export default function ProductsPage() {
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+            className="px-3 py-2 text-xs font-bold rounded-xl border border-[#EDE4D5] bg-[#FAF7EE] text-[#4A2E1B] focus:outline-none focus:ring-2 focus:ring-[#E87A18]"
           >
             <option value="ALL">All Categories</option>
             {categories.map((c) => (
@@ -348,18 +348,18 @@ export default function ProductsPage() {
           <select
             value={stockFilter}
             onChange={(e) => setStockFilter(e.target.value as any)}
-            className="px-3 py-2 text-xs font-bold rounded-xl border border-slate-200 bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+            className="px-3 py-2 text-xs font-bold rounded-xl border border-[#EDE4D5] bg-[#FAF7EE] text-[#4A2E1B] focus:outline-none focus:ring-2 focus:ring-[#E87A18]"
           >
             <option value="ALL">All Stock Levels</option>
             <option value="IN_STOCK">In Stock (&gt; 0)</option>
             <option value="LOW_STOCK">Low Shelf Stock (&le; 15)</option>
           </select>
 
-          <div className="flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200">
+          <div className="flex items-center rounded-xl bg-[#F4ECE1] p-1 border border-[#EDE4D5]">
             <button
               onClick={() => setViewMode('GRID')}
               className={`p-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                viewMode === 'GRID' ? 'bg-white shadow-sm text-amber-900' : 'text-slate-500 hover:text-slate-800'
+                viewMode === 'GRID' ? 'bg-[#FFFDF8] shadow-sm text-[#4A2E1B]' : 'text-[#8C7361] hover:text-[#2C1B10]'
               }`}
               title="Grid View"
             >
@@ -368,7 +368,7 @@ export default function ProductsPage() {
             <button
               onClick={() => setViewMode('TABLE')}
               className={`p-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
-                viewMode === 'TABLE' ? 'bg-white shadow-sm text-amber-900' : 'text-slate-500 hover:text-slate-800'
+                viewMode === 'TABLE' ? 'bg-[#FFFDF8] shadow-sm text-[#4A2E1B]' : 'text-[#8C7361] hover:text-[#2C1B10]'
               }`}
               title="Table View"
             >
@@ -382,24 +382,24 @@ export default function ProductsPage() {
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-            <div key={i} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm animate-pulse space-y-3">
+            <div key={i} className="bg-[#FFFDF8] rounded-2xl p-5 border border-[#EDE4D5] shadow-sm animate-pulse space-y-3">
               <div className="h-4 bg-slate-200 rounded w-2/3" />
-              <div className="h-6 bg-slate-100 rounded w-1/3" />
-              <div className="h-10 bg-slate-50 rounded" />
+              <div className="h-6 bg-[#F4ECE1] rounded w-1/3" />
+              <div className="h-10 bg-[#FAF7EE] rounded" />
             </div>
           ))}
         </div>
       ) : filteredProducts.length === 0 ? (
-        <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-sm max-w-lg mx-auto">
-          <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto text-amber-700 mb-4">
+        <div className="bg-[#FFFDF8] rounded-3xl p-12 text-center border border-[#EDE4D5] shadow-sm max-w-lg mx-auto">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto text-[#E87A18] mb-4">
             <ShoppingBag className="w-7 h-7" />
           </div>
-          <h3 className="text-base font-bold text-slate-800">No products match your search</h3>
-          <p className="text-xs text-slate-500 mt-1">Try adjusting the filter criteria or add a new bread item.</p>
+          <h3 className="text-base font-bold text-[#2C1B10]">No products match your search</h3>
+          <p className="text-xs text-[#8C7361] mt-1">Try adjusting the filter criteria or add a new bread item.</p>
           {canManageProducts && (
             <button
               onClick={() => setShowAddModal(true)}
-              className="mt-4 px-4 py-2 rounded-xl bg-amber-700 text-white text-xs font-bold hover:bg-amber-800 transition shadow-sm inline-flex items-center gap-1.5"
+              className="mt-4 px-4 py-2 rounded-xl bg-[#4A2E1B] text-white text-xs font-bold hover:bg-[#4A2E1B] transition shadow-sm inline-flex items-center gap-1.5"
             >
               <Plus className="w-4 h-4" /> Add Product
             </button>
@@ -414,11 +414,11 @@ export default function ProductsPage() {
             return (
               <div
                 key={p.id}
-                className="bg-white rounded-2xl p-5 border border-slate-200 hover:border-amber-300 shadow-sm hover:shadow-md transition flex flex-col justify-between group relative overflow-hidden"
+                className="bg-[#FFFDF8] rounded-2xl p-5 border border-[#EDE4D5] hover:border-amber-300 shadow-sm hover:shadow-md transition flex flex-col justify-between group relative overflow-hidden"
               >
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-slate-100 text-slate-600 font-mono">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-[#F4ECE1] text-[#8C7361] font-mono">
                       {p.sku}
                     </span>
                     <span
@@ -426,7 +426,7 @@ export default function ProductsPage() {
                         isOutOfStock
                           ? 'bg-red-100 text-red-700 border border-red-200'
                           : isLowStock
-                          ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                          ? 'bg-amber-100 text-[#E87A18] border border-amber-200'
                           : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                       }`}
                     >
@@ -439,19 +439,19 @@ export default function ProductsPage() {
                     </span>
                   </div>
 
-                  <h3 className="font-bold text-slate-900 text-base leading-snug group-hover:text-amber-800 transition">
+                  <h3 className="font-bold text-[#2C1B10] text-base leading-snug group-hover:text-[#E87A18] transition">
                     {p.name}
                   </h3>
-                  <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                    <Tag className="w-3 h-3 text-slate-400" />
+                  <div className="text-xs text-[#8C7361] mt-1 flex items-center gap-1">
+                    <Tag className="w-3 h-3 text-[#8C7361]" />
                     <span>{p.category?.name || 'Fresh Bread'}</span>
                   </div>
                 </div>
 
-                <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
+                <div className="mt-5 pt-4 border-t border-[#EDE4D5] flex items-center justify-between">
                   <div>
-                    <div className="text-[10px] uppercase font-bold text-slate-400">Retail Price</div>
-                    <div className="text-lg font-black text-amber-900">{p.sellingPrice.toFixed(2)} ETB</div>
+                    <div className="text-[10px] uppercase font-bold text-[#8C7361]">Retail Price</div>
+                    <div className="text-lg font-black text-[#4A2E1B]">{p.sellingPrice.toFixed(2)} ETB</div>
                     {canManageProducts && p.costPrice && (
                       <div className="text-[10px] font-semibold text-emerald-700 mt-0.5">
                         Margin: +{(p.sellingPrice - p.costPrice).toFixed(2)} ETB ({(((p.sellingPrice - p.costPrice) / p.sellingPrice) * 100).toFixed(0)}%)
@@ -462,7 +462,7 @@ export default function ProductsPage() {
                   {canManageProducts && (
                     <button
                       onClick={() => setEditingProduct(p)}
-                      className="p-2 rounded-xl bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-300 text-slate-600 hover:text-amber-800 transition"
+                      className="p-2 rounded-xl bg-[#FAF7EE] hover:bg-amber-50 border border-[#EDE4D5] hover:border-amber-300 text-[#8C7361] hover:text-[#E87A18] transition"
                       title="Edit Price & Details"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
@@ -474,10 +474,10 @@ export default function ProductsPage() {
           })}
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-[#FFFDF8] rounded-2xl border border-[#EDE4D5] shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50/80 text-slate-500 font-bold border-b border-slate-200">
+              <thead className="bg-[#FAF7EE] text-[#8C7361] font-bold border-b border-[#EDE4D5]">
                 <tr>
                   <th className="py-3.5 px-4">Product Name</th>
                   <th className="py-3.5 px-4">SKU</th>
@@ -489,15 +489,15 @@ export default function ProductsPage() {
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
+              <tbody className="divide-y divide-[#EDE4D5] text-[#4A2E1B]">
                 {filteredProducts.map((p) => (
                   <tr key={p.id} className="hover:bg-amber-50/40 transition">
-                    <td className="py-3.5 px-4 font-bold text-slate-900">{p.name}</td>
-                    <td className="py-3.5 px-4 font-mono text-slate-500">{p.sku}</td>
-                    <td className="py-3.5 px-4 text-slate-600">{p.category?.name || 'Fresh Bread'}</td>
-                    <td className="py-3.5 px-4 font-bold text-amber-900">{p.sellingPrice.toFixed(2)} ETB</td>
+                    <td className="py-3.5 px-4 font-bold text-[#2C1B10]">{p.name}</td>
+                    <td className="py-3.5 px-4 font-mono text-[#8C7361]">{p.sku}</td>
+                    <td className="py-3.5 px-4 text-[#8C7361]">{p.category?.name || 'Fresh Bread'}</td>
+                    <td className="py-3.5 px-4 font-bold text-[#4A2E1B]">{p.sellingPrice.toFixed(2)} ETB</td>
                     {canManageProducts && (
-                      <td className="py-3.5 px-4 text-slate-500 font-mono">
+                      <td className="py-3.5 px-4 text-[#8C7361] font-mono">
                         {p.costPrice ? `${p.costPrice.toFixed(2)} ETB` : '—'}
                       </td>
                     )}
@@ -508,7 +508,7 @@ export default function ProductsPage() {
                             +{(p.sellingPrice - p.costPrice).toFixed(2)} ETB ({(((p.sellingPrice - p.costPrice) / p.sellingPrice) * 100).toFixed(0)}%)
                           </span>
                         ) : (
-                          <span className="text-slate-400">—</span>
+                          <span className="text-[#8C7361]">—</span>
                         )}
                       </td>
                     )}
@@ -518,7 +518,7 @@ export default function ProductsPage() {
                           p.availableStock === 0
                             ? 'bg-red-100 text-red-700'
                             : p.availableStock <= 15
-                            ? 'bg-amber-100 text-amber-800'
+                            ? 'bg-amber-100 text-[#E87A18]'
                             : 'bg-emerald-100 text-emerald-800'
                         }`}
                       >
@@ -529,7 +529,7 @@ export default function ProductsPage() {
                       {canManageProducts && (
                         <button
                           onClick={() => setEditingProduct(p)}
-                          className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-amber-100 text-slate-700 hover:text-amber-900 font-bold text-xs transition inline-flex items-center gap-1"
+                          className="px-2.5 py-1.5 rounded-lg bg-[#F4ECE1] hover:bg-amber-100 text-[#4A2E1B] hover:text-[#4A2E1B] font-bold text-xs transition inline-flex items-center gap-1"
                         >
                           <Edit2 className="w-3 h-3" /> Edit
                         </button>
@@ -546,51 +546,51 @@ export default function ProductsPage() {
       {/* Modal: Add New Product */}
       {showAddModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-100 animate-scale-up">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
-              <div className="flex items-center gap-2 text-amber-800 font-bold">
+          <div className="bg-[#FFFDF8] rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-[#EDE4D5] animate-scale-up">
+            <div className="flex items-center justify-between pb-4 border-b border-[#EDE4D5] mb-5">
+              <div className="flex items-center gap-2 text-[#E87A18] font-bold">
                 <ShoppingBag className="w-5 h-5" />
                 <span>Add Product to Catalog</span>
               </div>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100"
+                className="text-[#8C7361] hover:text-[#8C7361] p-1.5 rounded-xl hover:bg-[#F4ECE1]"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateProduct} className="space-y-4 text-xs font-semibold text-slate-700">
+            <form onSubmit={handleCreateProduct} className="space-y-4 text-xs font-semibold text-[#4A2E1B]">
               <div>
-                <label className="block mb-1 text-slate-600">Product Name</label>
+                <label className="block mb-1 text-[#8C7361]">Product Name</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Standard 50g Loaf, French Baguette"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 text-sm"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#EDE4D5] focus:outline-none focus:ring-2 focus:ring-[#E87A18] focus:border-amber-500 text-sm"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block mb-1 text-slate-600">SKU Code</label>
+                  <label className="block mb-1 text-[#8C7361]">SKU Code</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. BREAD-50G"
                     value={formData.sku}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 font-mono text-sm uppercase"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#EDE4D5] focus:outline-none focus:ring-2 focus:ring-[#E87A18] focus:border-amber-500 font-mono text-sm uppercase"
                   />
                 </div>
                 <div>
-                  <label className="block mb-1 text-slate-600">Category</label>
+                  <label className="block mb-1 text-[#8C7361]">Category</label>
                   <select
                     value={formData.categoryId}
                     onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-sm bg-white"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#EDE4D5] focus:outline-none focus:ring-2 focus:ring-[#E87A18] text-sm bg-[#FFFDF8]"
                   >
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -603,7 +603,7 @@ export default function ProductsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block mb-1 text-slate-600">Selling Price (ETB)</label>
+                  <label className="block mb-1 text-[#8C7361]">Selling Price (ETB)</label>
                   <input
                     type="number"
                     step="0.25"
@@ -611,29 +611,29 @@ export default function ProductsPage() {
                     placeholder="15.00"
                     value={formData.sellingPrice}
                     onChange={(e) => setFormData({ ...formData, sellingPrice: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-sm"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#EDE4D5] focus:outline-none focus:ring-2 focus:ring-[#E87A18] text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block mb-1 text-slate-600">Cost Price (ETB - Optional)</label>
+                  <label className="block mb-1 text-[#8C7361]">Cost Price (ETB - Optional)</label>
                   <input
                     type="number"
                     step="0.25"
                     placeholder="9.50"
                     value={formData.costPrice}
                     onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-sm"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#EDE4D5] focus:outline-none focus:ring-2 focus:ring-[#E87A18] text-sm"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block mb-1 text-slate-600">Unit Type</label>
+                  <label className="block mb-1 text-[#8C7361]">Unit Type</label>
                   <select
                     value={formData.unit}
                     onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-sm bg-white"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#EDE4D5] focus:outline-none focus:ring-2 focus:ring-[#E87A18] text-sm bg-[#FFFDF8]"
                   >
                     <option value="PIECE">PIECE</option>
                     <option value="PACK">PACK</option>
@@ -641,28 +641,28 @@ export default function ProductsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block mb-1 text-slate-600">Initial Shelf Stock</label>
+                  <label className="block mb-1 text-[#8C7361]">Initial Shelf Stock</label>
                   <input
                     type="number"
                     value={formData.initialStock}
                     onChange={(e) => setFormData({ ...formData, initialStock: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-sm"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#EDE4D5] focus:outline-none focus:ring-2 focus:ring-[#E87A18] text-sm"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-[#EDE4D5]">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
+                  className="px-4 py-2.5 rounded-xl border border-[#EDE4D5] text-[#8C7361] hover:bg-[#FAF7EE] transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2.5 rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-bold transition flex items-center gap-1.5 shadow-md"
+                  className="px-5 py-2.5 rounded-xl bg-[#4A2E1B] hover:bg-[#4A2E1B] text-white font-bold transition flex items-center gap-1.5 shadow-md"
                 >
                   {submitting ? 'Saving...' : 'Save Product'}
                 </button>
@@ -675,35 +675,35 @@ export default function ProductsPage() {
       {/* Modal: Edit Product Price & Details */}
       {editingProduct && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 animate-scale-up">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-5">
-              <div className="flex items-center gap-2 text-amber-800 font-bold">
+          <div className="bg-[#FFFDF8] rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-[#EDE4D5] animate-scale-up">
+            <div className="flex items-center justify-between pb-4 border-b border-[#EDE4D5] mb-5">
+              <div className="flex items-center gap-2 text-[#E87A18] font-bold">
                 <Edit2 className="w-4 h-4" />
                 <span>Edit Product Details</span>
               </div>
               <button
                 onClick={() => setEditingProduct(null)}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100"
+                className="text-[#8C7361] hover:text-[#8C7361] p-1.5 rounded-xl hover:bg-[#F4ECE1]"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleUpdateProduct} className="space-y-4 text-xs font-semibold text-slate-700">
+            <form onSubmit={handleUpdateProduct} className="space-y-4 text-xs font-semibold text-[#4A2E1B]">
               <div>
-                <label className="block mb-1 text-slate-600">Product Name</label>
+                <label className="block mb-1 text-[#8C7361]">Product Name</label>
                 <input
                   type="text"
                   required
                   value={editingProduct.name}
                   onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-sm"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#EDE4D5] focus:outline-none focus:ring-2 focus:ring-[#E87A18] text-sm"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block mb-1 text-slate-600">Selling Price (ETB)</label>
+                  <label className="block mb-1 text-[#8C7361]">Selling Price (ETB)</label>
                   <input
                     type="number"
                     step="0.25"
@@ -712,11 +712,11 @@ export default function ProductsPage() {
                     onChange={(e) =>
                       setEditingProduct({ ...editingProduct, sellingPrice: parseFloat(e.target.value) || 0 })
                     }
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-sm"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#EDE4D5] focus:outline-none focus:ring-2 focus:ring-[#E87A18] text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block mb-1 text-slate-600">Cost Price (ETB)</label>
+                  <label className="block mb-1 text-[#8C7361]">Cost Price (ETB)</label>
                   <input
                     type="number"
                     step="0.25"
@@ -727,13 +727,13 @@ export default function ProductsPage() {
                         costPrice: e.target.value ? parseFloat(e.target.value) : null,
                       })
                     }
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-sm"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-[#EDE4D5] focus:outline-none focus:ring-2 focus:ring-[#E87A18] text-sm"
                   />
                 </div>
               </div>
 
               <div className="pt-2 flex items-center justify-between">
-                <label className="text-slate-600">Product Status</label>
+                <label className="text-[#8C7361]">Product Status</label>
                 <button
                   type="button"
                   onClick={() => setEditingProduct({ ...editingProduct, isActive: !editingProduct.isActive })}
@@ -745,18 +745,18 @@ export default function ProductsPage() {
                 </button>
               </div>
 
-              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-[#EDE4D5]">
                 <button
                   type="button"
                   onClick={() => setEditingProduct(null)}
-                  className="px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
+                  className="px-4 py-2.5 rounded-xl border border-[#EDE4D5] text-[#8C7361] hover:bg-[#FAF7EE] transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-5 py-2.5 rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-bold transition flex items-center gap-1.5 shadow-md"
+                  className="px-5 py-2.5 rounded-xl bg-[#4A2E1B] hover:bg-[#4A2E1B] text-white font-bold transition flex items-center gap-1.5 shadow-md"
                 >
                   {submitting ? 'Saving...' : 'Update Product'}
                 </button>
@@ -769,55 +769,55 @@ export default function ProductsPage() {
       {/* Modal: Add Category */}
       {showCategoryModal && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 animate-scale-up">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-              <div className="flex items-center gap-2 text-amber-800 font-bold">
+          <div className="bg-[#FFFDF8] rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-[#EDE4D5] animate-scale-up">
+            <div className="flex items-center justify-between pb-3 border-b border-[#EDE4D5] mb-4">
+              <div className="flex items-center gap-2 text-[#E87A18] font-bold">
                 <Layers className="w-4 h-4" />
                 <span>New Category</span>
               </div>
               <button
                 onClick={() => setShowCategoryModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl hover:bg-slate-100"
+                className="text-[#8C7361] hover:text-[#8C7361] p-1.5 rounded-xl hover:bg-[#F4ECE1]"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateCategory} className="space-y-3 text-xs font-semibold text-slate-700">
+            <form onSubmit={handleCreateCategory} className="space-y-3 text-xs font-semibold text-[#4A2E1B]">
               <div>
-                <label className="block mb-1 text-slate-600">Category Name</label>
+                <label className="block mb-1 text-[#8C7361]">Category Name</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Pastries, Specialty Breads"
                   value={categoryFormData.name}
                   onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-sm"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#EDE4D5] focus:outline-none focus:ring-2 focus:ring-[#E87A18] text-sm"
                 />
               </div>
               <div>
-                <label className="block mb-1 text-slate-600">Description (Optional)</label>
+                <label className="block mb-1 text-[#8C7361]">Description (Optional)</label>
                 <input
                   type="text"
                   placeholder="Brief note about this category"
                   value={categoryFormData.description}
                   onChange={(e) => setCategoryFormData({ ...categoryFormData, description: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-sm"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#EDE4D5] focus:outline-none focus:ring-2 focus:ring-[#E87A18] text-sm"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#EDE4D5]">
                 <button
                   type="button"
                   onClick={() => setShowCategoryModal(false)}
-                  className="px-3 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition"
+                  className="px-3 py-2 rounded-xl border border-[#EDE4D5] text-[#8C7361] hover:bg-[#FAF7EE] transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 rounded-xl bg-amber-700 hover:bg-amber-800 text-white font-bold transition shadow-md"
+                  className="px-4 py-2 rounded-xl bg-[#4A2E1B] hover:bg-[#4A2E1B] text-white font-bold transition shadow-md"
                 >
                   Create
                 </button>

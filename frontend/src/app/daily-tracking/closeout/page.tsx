@@ -197,7 +197,7 @@ export default function CloseoutPage() {
       )}
 
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-amber-700 via-amber-600 to-amber-800 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-r from-[#4A2E1B] via-[#5A3A23] to-[#E87A18] rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/30 backdrop-blur-sm border border-amber-400/30 text-amber-100 text-xs font-semibold mb-3">
@@ -282,11 +282,11 @@ export default function CloseoutPage() {
       {/* Main Reconciliation Section */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* LEFT: Reconciliation Calculator Form (7 Cols) */}
-        <div className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-6">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div className="lg:col-span-7 bg-[#FFFDF8] rounded-3xl p-6 sm:p-7 border border-[#EDE4D5] shadow-sm space-y-6">
+          <div className="flex items-center justify-between pb-3 border-b border-[#EDE4D5]">
             <div className="flex items-center gap-2">
-              <Coins className="w-5 h-5 text-amber-700" />
-              <h2 className="text-base font-bold text-slate-900">Cash Drawer Counting Form</h2>
+              <Coins className="w-5 h-5 text-[#E87A18]" />
+              <h2 className="text-base font-bold text-[#2C1B10]">Cash Drawer Counting Form</h2>
             </div>
             {summary?.closeout && (
               <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1">
@@ -295,49 +295,49 @@ export default function CloseoutPage() {
             )}
           </div>
 
-          <form onSubmit={handleSubmitCloseout} className="space-y-4 text-xs font-semibold text-slate-700">
+          <form onSubmit={handleSubmitCloseout} className="space-y-4 text-xs font-semibold text-[#4A2E1B]">
             {/* Input Row 1: Starting Float & Expenses */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block mb-1 text-slate-600">Starting Float (Morning Change)</label>
+                <label className="block mb-1 text-[#8C7361]">Starting Float (Morning Change)</label>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">ETB</span>
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8C7361] font-bold">ETB</span>
                   <input
                     type="number"
                     step="0.5"
                     required
                     value={startingFloat}
                     onChange={(e) => setStartingFloat(e.target.value)}
-                    className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-slate-200 font-black text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                    className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-[#EDE4D5] font-black text-sm text-[#2C1B10] focus:outline-none focus:ring-2 focus:ring-[#E87A18]"
                   />
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">Cash in drawer at start of shift</p>
+                <p className="text-[10px] text-[#8C7361] mt-1">Cash in drawer at start of shift</p>
               </div>
 
               <div>
-                <label className="block mb-1 text-slate-600">Total Drawer Expenses (Cash Out)</label>
+                <label className="block mb-1 text-[#8C7361]">Total Drawer Expenses (Cash Out)</label>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold">ETB</span>
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#8C7361] font-bold">ETB</span>
                   <input
                     type="number"
                     step="0.5"
                     required
                     value={totalExpenses}
                     onChange={(e) => setTotalExpenses(e.target.value)}
-                    className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-slate-200 font-black text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                    className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-[#EDE4D5] font-black text-sm text-[#2C1B10] focus:outline-none focus:ring-2 focus:ring-[#E87A18]"
                   />
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">Petty cash paid out for supplies/repairs</p>
+                <p className="text-[10px] text-[#8C7361] mt-1">Petty cash paid out for supplies/repairs</p>
               </div>
             </div>
 
             {/* Input Row 2: Physical Cash Counted */}
             <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200/60 space-y-2">
-              <label className="block text-amber-900 font-bold text-sm">
+              <label className="block text-[#4A2E1B] font-bold text-sm">
                 Physical Cash Counted in Drawer (Evening Total)
               </label>
               <div className="relative">
-                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-amber-700 font-bold">ETB</span>
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#E87A18] font-bold">ETB</span>
                 <input
                   type="number"
                   step="0.5"
@@ -345,23 +345,23 @@ export default function CloseoutPage() {
                   placeholder="Enter physical cash bills & coins counted"
                   value={actualCountedCash}
                   onChange={(e) => setActualCountedCash(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-amber-300 bg-white font-black text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-amber-300 bg-[#FFFDF8] font-black text-base text-[#2C1B10] focus:outline-none focus:ring-2 focus:ring-[#E87A18]"
                 />
               </div>
-              <p className="text-[11px] text-amber-800">
+              <p className="text-[11px] text-[#4A2E1B]">
                 Count all bank notes and coins currently sitting in the physical drawer.
               </p>
             </div>
 
             {/* Notes */}
             <div>
-              <label className="block mb-1 text-slate-600">Closeout Notes &amp; Variance Explanations</label>
+              <label className="block mb-1 text-[#8C7361]">Closeout Notes &amp; Variance Explanations</label>
               <textarea
                 rows={2}
                 placeholder="Explain any discrepancy, tips, petty cash receipts, or shift handoff notes..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/30 text-xs font-normal"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-[#EDE4D5] focus:outline-none focus:ring-2 focus:ring-[#E87A18] text-xs font-normal"
               />
             </div>
 
@@ -371,8 +371,8 @@ export default function CloseoutPage() {
               disabled={submitting || !hasEnteredCash}
               className={`w-full py-3.5 rounded-2xl font-black text-sm transition flex items-center justify-center gap-2 shadow-md active:scale-95 ${
                 submitting || !hasEnteredCash
-                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                  : 'bg-amber-800 hover:bg-amber-900 text-white shadow-amber-800/30'
+                  ? 'bg-slate-200 text-[#8C7361] cursor-not-allowed shadow-none'
+                  : 'bg-[#4A2E1B] hover:bg-[#3A2314] text-white shadow-amber-800/30'
               }`}
             >
               <Save className="w-4 h-4" />
@@ -387,12 +387,12 @@ export default function CloseoutPage() {
           <div
             className={`rounded-3xl p-6 border shadow-sm transition space-y-4 ${
               !hasEnteredCash
-                ? 'bg-slate-50 border-slate-200 text-slate-600'
+                ? 'bg-[#FAF7EE] border-[#EDE4D5] text-[#8C7361]'
                 : variance === 0
                 ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
                 : variance < 0
                 ? 'bg-red-50 border-red-200 text-red-900'
-                : 'bg-amber-50 border-amber-200 text-amber-900'
+                : 'bg-amber-50 border-amber-200 text-[#4A2E1B]'
             }`}
           >
             <div className="flex items-center justify-between">
@@ -400,12 +400,12 @@ export default function CloseoutPage() {
               <span
                 className={`px-2.5 py-0.5 rounded-full text-xs font-bold flex items-center gap-1 ${
                   !hasEnteredCash
-                    ? 'bg-slate-200 text-slate-700'
+                    ? 'bg-slate-200 text-[#4A2E1B]'
                     : variance === 0
                     ? 'bg-emerald-200 text-emerald-900'
                     : variance < 0
                     ? 'bg-red-200 text-red-900'
-                    : 'bg-amber-200 text-amber-900'
+                    : 'bg-amber-200 text-[#4A2E1B]'
                 }`}
               >
                 {!hasEnteredCash ? (
@@ -420,33 +420,33 @@ export default function CloseoutPage() {
                   </>
                 ) : (
                   <>
-                    <TrendingUp className="w-3.5 h-3.5 text-amber-700" /> Cash Overage
+                    <TrendingUp className="w-3.5 h-3.5 text-[#E87A18]" /> Cash Overage
                   </>
                 )}
               </span>
             </div>
 
             {/* Formula Breakdown */}
-            <div className="space-y-2 pt-2 border-t border-slate-200/60 text-xs">
+            <div className="space-y-2 pt-2 border-t border-[#EDE4D5]/60 text-xs">
               <div className="flex justify-between">
-                <span className="text-slate-500">Starting Float:</span>
+                <span className="text-[#8C7361]">Starting Float:</span>
                 <span className="font-mono font-bold">+{floatNum.toFixed(2)} ETB</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Total Cash Sales:</span>
+                <span className="text-[#8C7361]">Total Cash Sales:</span>
                 <span className="font-mono font-bold text-emerald-700">+{cashSales.toFixed(2)} ETB</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-500">Total Expenses Paid:</span>
+                <span className="text-[#8C7361]">Total Expenses Paid:</span>
                 <span className="font-mono font-bold text-red-600">-{expensesNum.toFixed(2)} ETB</span>
               </div>
 
-              <div className="flex justify-between pt-2 border-t border-slate-200 font-bold text-slate-800">
+              <div className="flex justify-between pt-2 border-t border-[#EDE4D5] font-bold text-[#2C1B10]">
                 <span>Expected Cash:</span>
                 <span className="font-mono">{expectedCash.toFixed(2)} ETB</span>
               </div>
 
-              <div className="flex justify-between font-bold text-slate-800">
+              <div className="flex justify-between font-bold text-[#2C1B10]">
                 <span>Actual Counted Cash:</span>
                 <span className="font-mono">
                   {hasEnteredCash ? `${countedNum.toFixed(2)} ETB` : '—'}
@@ -455,13 +455,13 @@ export default function CloseoutPage() {
             </div>
 
             {/* Big Variance Display */}
-            <div className="pt-3 border-t border-slate-200/60 flex items-baseline justify-between">
+            <div className="pt-3 border-t border-[#EDE4D5]/60 flex items-baseline justify-between">
               <div>
-                <span className="text-[11px] uppercase font-bold text-slate-500">Discrepancy (Variance)</span>
+                <span className="text-[11px] uppercase font-bold text-[#8C7361]">Discrepancy (Variance)</span>
                 <div
                   className={`text-2xl font-black ${
                     !hasEnteredCash
-                      ? 'text-slate-400'
+                      ? 'text-[#8C7361]'
                       : variance === 0
                       ? 'text-emerald-700'
                       : variance < 0
@@ -474,21 +474,21 @@ export default function CloseoutPage() {
               </div>
 
               {hasEnteredCash && variance !== 0 && (
-                <div className="text-[11px] font-bold text-slate-500 text-right max-w-[140px]">
+                <div className="text-[11px] font-bold text-[#8C7361] text-right max-w-[140px]">
                   {variance < 0 ? 'Cashier is short by' : 'Cashier has excess of'}{' '}
-                  <span className="font-black text-slate-900">{Math.abs(variance).toFixed(2)} ETB</span>
+                  <span className="font-black text-[#2C1B10]">{Math.abs(variance).toFixed(2)} ETB</span>
                 </div>
               )}
             </div>
           </div>
 
           {/* Continuous Date Rule Card */}
-          <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-2 text-xs">
-            <div className="flex items-center gap-2 font-bold text-slate-900">
+          <div className="bg-[#FFFDF8] rounded-3xl p-5 border border-[#EDE4D5] shadow-sm space-y-2 text-xs">
+            <div className="flex items-center gap-2 font-bold text-[#2C1B10]">
               <Unlock className="w-4 h-4 text-emerald-600" />
               <span>Continuous Date Policy</span>
             </div>
-            <p className="text-slate-500 leading-relaxed text-[11px]">
+            <p className="text-[#8C7361] leading-relaxed text-[11px]">
               Submitting closeouts records daily financial snapshots for auditing. In accordance with continuous date
               operations, POS transactions are never blocked and terminal state remains continuously active.
             </p>
@@ -497,20 +497,20 @@ export default function CloseoutPage() {
       </div>
 
       {/* Historical Closeouts Table */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden space-y-3 p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
+      <div className="bg-[#FFFDF8] rounded-3xl border border-[#EDE4D5] shadow-sm overflow-hidden space-y-3 p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#EDE4D5] gap-3">
           <div className="flex items-center gap-2">
-            <History className="w-5 h-5 text-amber-700" />
-            <h2 className="text-base font-bold text-slate-900">Branch Closeout Audit Trail</h2>
+            <History className="w-5 h-5 text-[#E87A18]" />
+            <h2 className="text-base font-bold text-[#2C1B10]">Branch Closeout Audit Trail</h2>
           </div>
           <div className="flex items-center gap-3">
             {isOwnerOrAdmin && (
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs">
+              <div className="flex items-center bg-[#F4ECE1] p-0.5 rounded-xl border border-[#EDE4D5] text-xs">
                 <button
                   type="button"
                   onClick={() => setShowAllBranchesHistory(true)}
                   className={`px-2.5 py-1 rounded-lg font-bold transition ${
-                    showAllBranchesHistory ? 'bg-white text-amber-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                    showAllBranchesHistory ? 'bg-[#FFFDF8] text-[#4A2E1B] shadow-xs' : 'text-[#8C7361] hover:text-[#2C1B10]'
                   }`}
                 >
                   All Outlets
@@ -519,20 +519,20 @@ export default function CloseoutPage() {
                   type="button"
                   onClick={() => setShowAllBranchesHistory(false)}
                   className={`px-2.5 py-1 rounded-lg font-bold transition ${
-                    !showAllBranchesHistory ? 'bg-white text-amber-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                    !showAllBranchesHistory ? 'bg-[#FFFDF8] text-[#4A2E1B] shadow-xs' : 'text-[#8C7361] hover:text-[#2C1B10]'
                   }`}
                 >
                   {activeBranch?.code || 'Current'} Only
                 </button>
               </div>
             )}
-            <span className="text-xs text-slate-400 font-semibold">{history.length} records logged</span>
+            <span className="text-xs text-[#8C7361] font-semibold">{history.length} records logged</span>
           </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-slate-500 font-bold border-b border-slate-200">
+            <thead className="bg-[#FAF7EE] text-[#8C7361] font-bold border-b border-[#EDE4D5]">
               <tr>
                 <th className="py-3 px-4">Business Date</th>
                 <th className="py-3 px-4">Branch</th>
@@ -544,22 +544,22 @@ export default function CloseoutPage() {
                 <th className="py-3 px-4">Notes</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
+            <tbody className="divide-y divide-[#EDE4D5] text-[#4A2E1B]">
               {history.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400">
+                  <td colSpan={8} className="py-8 text-center text-[#8C7361]">
                     No historical closeout records found.
                   </td>
                 </tr>
               ) : (
                 history.map((record) => (
                   <tr key={record.id} className="hover:bg-amber-50/30 transition">
-                    <td className="py-3 px-4 font-bold font-mono text-slate-900">{record.businessDate}</td>
+                    <td className="py-3 px-4 font-bold font-mono text-[#2C1B10]">{record.businessDate}</td>
                     <td className="py-3 px-4 font-semibold">{record.branch.name}</td>
-                    <td className="py-3 px-4 text-slate-600">{record.submittedByUser.fullName}</td>
+                    <td className="py-3 px-4 text-[#8C7361]">{record.submittedByUser.fullName}</td>
                     <td className="py-3 px-4 font-bold text-emerald-800">{record.totalCashSales.toFixed(2)}</td>
                     <td className="py-3 px-4 font-mono">{record.expectedCash.toFixed(2)}</td>
-                    <td className="py-3 px-4 font-mono font-bold text-slate-900">
+                    <td className="py-3 px-4 font-mono font-bold text-[#2C1B10]">
                       {record.actualCountedCash.toFixed(2)}
                     </td>
                     <td className="py-3 px-4">
@@ -569,7 +569,7 @@ export default function CloseoutPage() {
                             ? 'bg-emerald-100 text-emerald-800'
                             : record.variance < 0
                             ? 'bg-red-100 text-red-800'
-                            : 'bg-amber-100 text-amber-800'
+                            : 'bg-amber-100 text-[#4A2E1B]'
                         }`}
                       >
                         {record.variance === 0 ? (
@@ -579,7 +579,7 @@ export default function CloseoutPage() {
                         )}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-slate-500 max-w-xs truncate">{record.notes || '—'}</td>
+                    <td className="py-3 px-4 text-[#8C7361] max-w-xs truncate">{record.notes || '—'}</td>
                   </tr>
                 ))
               )}
