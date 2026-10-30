@@ -1,28 +1,14 @@
 import { PrismaClient } from '@prisma/client';
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import { PrismaNeon } from '@prisma/adapter-neon';
+import ws from 'ws';
 
 function getDatabaseUrl(): string | undefined {
-  let url = process.env.DATABASE_URL?.trim();
+  let url = (process.env.DATABASE_URL_UNPOOLED || process.env.DIRECT_URL || process.env.DATABASE_URL)?.trim();
   if (!url) return undefined;
 
   // Strip wrapping double or single quotes if present
   url = url.replace(/^["']|["']$/g, '').trim();
-
-  // PgBouncer pooler requires pgbouncer=true to disable prepared statements
-  if ((url.includes(':6543') || url.includes('pooler')) && !url.includes('pgbouncer=')) {
-    const separator = url.includes('?') ? '&' : '?';
-    url = `${url}${separator}pgbouncer=true`;
-  }
-
-  if (!url.includes('connect_timeout=')) {
-    const separator = url.includes('?') ? '&' : '?';
-    url = `${url}${separator}connect_timeout=30`;
-  }
-
-  if (!url.includes('pool_timeout=')) {
-    const separator = url.includes('?') ? '&' : '?';
-    url = `${url}${separator}pool_timeout=30`;
-  }
-
   return url;
 }
 
@@ -30,18 +16,23 @@ const dbUrl = getDatabaseUrl();
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
+function createPrismaClient(): PrismaClient {
+  if (dbUrl && (dbUrl.includes('neon.tech') || dbUrl.includes('postgres'))) {
+    neonConfig.webSocketConstructor = ws;
+    const pool = new Pool({ connectionString: dbUrl });
+    const adapter = new PrismaNeon(pool);
+    return new PrismaClient({
+      adapter,
+      log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+    });
+  }
+
+  return new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
-    datasources: dbUrl
-      ? {
-          db: {
-            url: dbUrl,
-          },
-        }
-      : undefined,
   });
+}
+
+export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.prisma = prisma;

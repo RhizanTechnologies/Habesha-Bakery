@@ -1,6 +1,7 @@
 // Habesha Bakery ERP - Foundation Schema
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -57,8 +58,10 @@ model Branch {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  users         User[]
-  productStocks BranchProductStock[]
+  users              User[]
+  productStocks      BranchProductStock[]
+  sales              Sale[]
+  dailyCashTrackings DailyCashTracking[]
 
   @@index([companyId])
 }
@@ -80,6 +83,8 @@ model User {
   updatedAt    DateTime  @updatedAt
 
   passwordResetRequests PasswordResetRequest[]
+  sales                 Sale[]
+  dailyCashTrackings    DailyCashTracking[]
 
   @@index([branchId])
   @@index([role])
@@ -106,6 +111,7 @@ model Product {
   updatedAt    DateTime           @updatedAt
 
   branchStocks BranchProductStock[]
+  saleItems    SaleItem[]
 
   @@index([categoryId])
 }
@@ -154,4 +160,63 @@ model PasswordResetRequest {
 
   @@index([userId])
   @@index([status])
+}
+
+// ─── DEVELOPER 2: SALES, POS & CASH TRACKING ────────────────────────────────
+
+model Sale {
+  id            String        @id @default(cuid())
+  receiptNumber String        @unique // e.g. "REC-MEG-20261030-0001"
+  branchId      String
+  branch        Branch        @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  cashierId     String
+  cashier       User          @relation(fields: [cashierId], references: [id])
+  businessDate  String        // "YYYY-MM-DD"
+  paymentMethod PaymentMethod @default(CASH)
+  totalAmount   Decimal       @db.Decimal(10, 2)
+  customerName  String?
+  customerPhone String?
+  items         SaleItem[]
+  createdAt     DateTime      @default(now())
+
+  @@index([branchId])
+  @@index([cashierId])
+  @@index([businessDate])
+}
+
+model SaleItem {
+  id        String   @id @default(cuid())
+  saleId    String
+  sale      Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Int
+  unitPrice Decimal  @db.Decimal(10, 2)
+  subtotal  Decimal  @db.Decimal(10, 2)
+
+  @@index([saleId])
+  @@index([productId])
+}
+
+model DailyCashTracking {
+  id                String   @id @default(cuid())
+  branchId          String
+  branch            Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  businessDate      String   // "YYYY-MM-DD"
+  startingFloat     Decimal  @default(0) @db.Decimal(10, 2)
+  totalCashSales    Decimal  @default(0) @db.Decimal(10, 2)
+  totalDigitalSales Decimal  @default(0) @db.Decimal(10, 2)
+  totalExpenses     Decimal  @default(0) @db.Decimal(10, 2)
+  expectedCash      Decimal  @db.Decimal(10, 2)
+  actualCountedCash Decimal  @db.Decimal(10, 2)
+  variance          Decimal  @db.Decimal(10, 2) // actualCountedCash - expectedCash
+  submittedByUserId String
+  submittedByUser   User     @relation(fields: [submittedByUserId], references: [id])
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([branchId, businessDate])
+  @@index([branchId])
+  @@index([businessDate])
 }
