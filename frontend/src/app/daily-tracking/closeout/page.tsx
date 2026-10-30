@@ -79,6 +79,8 @@ export default function CloseoutPage() {
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [history, setHistory] = useState<CloseoutRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const isOwnerOrAdmin = user?.role === 'OWNER' || user?.role === 'ADMIN';
+  const [showAllBranchesHistory, setShowAllBranchesHistory] = useState(true);
 
   // Reconciliation Form
   const [startingFloat, setStartingFloat] = useState<string>('500');
@@ -92,9 +94,12 @@ export default function CloseoutPage() {
   const fetchSummary = async (date: string) => {
     setLoading(true);
     const branchParam = activeBranch?.id ? `&branchId=${activeBranch.id}` : '';
+    const histParam = (isOwnerOrAdmin && showAllBranchesHistory)
+      ? ''
+      : (activeBranch?.id ? `branchId=${activeBranch.id}` : '');
     const [sumRes, histRes] = await Promise.all([
       apiRequest<SummaryData>(`/daily-tracking/summary?businessDate=${date}${branchParam}`),
-      apiRequest<CloseoutRecord[]>(`/daily-tracking/history?${branchParam ? branchParam.slice(1) : ''}`),
+      apiRequest<CloseoutRecord[]>(`/daily-tracking/history${histParam ? `?${histParam}` : ''}`),
     ]);
 
     if (sumRes.data) {
@@ -120,7 +125,7 @@ export default function CloseoutPage() {
 
   useEffect(() => {
     fetchSummary(selectedDate);
-  }, [selectedDate, activeBranch?.id]);
+  }, [selectedDate, activeBranch?.id, showAllBranchesHistory]);
 
   // Reconciliation Arithmetic:
   // expectedCash = startingFloat + totalCashSales - totalExpenses
@@ -493,12 +498,36 @@ export default function CloseoutPage() {
 
       {/* Historical Closeouts Table */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden space-y-3 p-6">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-3">
           <div className="flex items-center gap-2">
             <History className="w-5 h-5 text-amber-700" />
             <h2 className="text-base font-bold text-slate-900">Branch Closeout Audit Trail</h2>
           </div>
-          <span className="text-xs text-slate-400 font-semibold">{history.length} records logged</span>
+          <div className="flex items-center gap-3">
+            {isOwnerOrAdmin && (
+              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setShowAllBranchesHistory(true)}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                    showAllBranchesHistory ? 'bg-white text-amber-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  All Outlets
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAllBranchesHistory(false)}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                    !showAllBranchesHistory ? 'bg-white text-amber-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  {activeBranch?.code || 'Current'} Only
+                </button>
+              </div>
+            )}
+            <span className="text-xs text-slate-400 font-semibold">{history.length} records logged</span>
+          </div>
         </div>
 
         <div className="overflow-x-auto">

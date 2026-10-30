@@ -44,14 +44,15 @@ export default function DashboardPage() {
   const [showExpenseDetail, setShowExpenseDetail] = useState(false);
 
   // Daily totals
-  const [yesterdayCash] = useState(0);
-  const [salesIncome] = useState(0);
+  const [yesterdayCash, setYesterdayCash] = useState(500);
+  const [salesIncome, setSalesIncome] = useState(0);
   const [creditReceived] = useState(0);
   const [tomorrowCash] = useState(0);
-  const [companyExpense] = useState(0);
+  const [companyExpense, setCompanyExpense] = useState(0);
   const [supplierCost] = useState(0);
   const [payrollCost] = useState(0);
   const [ownerWithdrawals] = useState(0);
+  const [todayOrders, setTodayOrders] = useState(0);
 
   // Staff summary
   const [staffList, setStaffList] = useState<UserSummary[]>([]);
@@ -67,6 +68,23 @@ export default function DashboardPage() {
       })
       .finally(() => setIsLoadingStaff(false));
   }, []);
+
+  // Fetch live daily sales summary for active branch
+  useEffect(() => {
+    const branchParam = activeBranch?.id ? `?branchId=${activeBranch.id}` : '';
+    apiRequest<any>(`/daily-tracking/summary${branchParam}`)
+      .then((res) => {
+        if (res.data) {
+          setSalesIncome(res.data.totalGrossSales || res.data.totalCashSales || 0);
+          setTodayOrders(res.data.totalOrders || 0);
+          if (res.data.closeout) {
+            setYesterdayCash(Number(res.data.closeout.startingFloat) || 500);
+            setCompanyExpense(Number(res.data.closeout.totalExpenses) || 0);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [activeBranch?.id]);
 
   // Today Gain formula: Yesterday + Sales + Credit Received - Tomorrow Leftover
   const todayGain = yesterdayCash + salesIncome + creditReceived - tomorrowCash;
@@ -97,7 +115,59 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Primary Hero Cards: Today's Revenue (Gain) & Today's Expense (Costs) ── */}
+      {/* ── Quick Action Shortcuts ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Link
+          href="/pos"
+          className="p-3.5 rounded-2xl bg-white border border-[#EDE4D5] hover:border-[#E87A18] hover:shadow-md transition group flex items-center gap-3"
+        >
+          <div className="w-10 h-10 rounded-xl bg-amber-50 text-[#E87A18] flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+            <Store className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-black text-[#2C1B10] group-hover:text-[#E87A18] truncate">Counter POS</div>
+            <div className="text-[10px] text-[#8C7361] font-medium truncate">Touchscreen Register</div>
+          </div>
+        </Link>
+        <Link
+          href="/daily-tracking/closeout"
+          className="p-3.5 rounded-2xl bg-white border border-[#EDE4D5] hover:border-emerald-500 hover:shadow-md transition group flex items-center gap-3"
+        >
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+            <Receipt className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-black text-[#2C1B10] group-hover:text-emerald-700 truncate">Daily Closeout</div>
+            <div className="text-[10px] text-[#8C7361] font-medium truncate">Drawer Reconciliation</div>
+          </div>
+        </Link>
+        <Link
+          href="/products"
+          className="p-3.5 rounded-2xl bg-white border border-[#EDE4D5] hover:border-blue-500 hover:shadow-md transition group flex items-center gap-3"
+        >
+          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+            <Package className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-black text-[#2C1B10] group-hover:text-blue-700 truncate">Product Catalog</div>
+            <div className="text-[10px] text-[#8C7361] font-medium truncate">Prices & Shelf Stock</div>
+          </div>
+        </Link>
+        <Link
+          href="/branches"
+          className="p-3.5 rounded-2xl bg-white border border-[#EDE4D5] hover:border-teal-500 hover:shadow-md transition group flex items-center gap-3"
+        >
+          <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+            <Building2 className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-xs font-black text-[#2C1B10] group-hover:text-teal-700 truncate">Branch Network</div>
+            <div className="text-[10px] text-[#8C7361] font-medium truncate">{branches.length} Outlets</div>
+          </div>
+        </Link>
+      </div>
+
+            {/* ── Primary Hero Cards: Today's Revenue (Gain) & Today's Expense (Costs) ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* TODAY'S REVENUE (GAIN) */}
         <div>

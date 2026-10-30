@@ -452,6 +452,11 @@ export default function ProductsPage() {
                   <div>
                     <div className="text-[10px] uppercase font-bold text-slate-400">Retail Price</div>
                     <div className="text-lg font-black text-amber-900">{p.sellingPrice.toFixed(2)} ETB</div>
+                    {canManageProducts && p.costPrice && (
+                      <div className="text-[10px] font-semibold text-emerald-700 mt-0.5">
+                        Margin: +{(p.sellingPrice - p.costPrice).toFixed(2)} ETB ({(((p.sellingPrice - p.costPrice) / p.sellingPrice) * 100).toFixed(0)}%)
+                      </div>
+                    )}
                   </div>
 
                   {canManageProducts && (
@@ -479,6 +484,7 @@ export default function ProductsPage() {
                   <th className="py-3.5 px-4">Category</th>
                   <th className="py-3.5 px-4">Selling Price</th>
                   {canManageProducts && <th className="py-3.5 px-4">Cost Price</th>}
+                  {canManageProducts && <th className="py-3.5 px-4">Gross Margin</th>}
                   <th className="py-3.5 px-4">Shelf Stock ({activeBranch?.code || 'Local'})</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
@@ -491,8 +497,19 @@ export default function ProductsPage() {
                     <td className="py-3.5 px-4 text-slate-600">{p.category?.name || 'Fresh Bread'}</td>
                     <td className="py-3.5 px-4 font-bold text-amber-900">{p.sellingPrice.toFixed(2)} ETB</td>
                     {canManageProducts && (
-                      <td className="py-3.5 px-4 text-slate-500">
+                      <td className="py-3.5 px-4 text-slate-500 font-mono">
                         {p.costPrice ? `${p.costPrice.toFixed(2)} ETB` : '—'}
+                      </td>
+                    )}
+                    {canManageProducts && (
+                      <td className="py-3.5 px-4">
+                        {p.costPrice ? (
+                          <span className="inline-flex items-center gap-1 font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 text-[11px]">
+                            +{(p.sellingPrice - p.costPrice).toFixed(2)} ETB ({(((p.sellingPrice - p.costPrice) / p.sellingPrice) * 100).toFixed(0)}%)
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                       </td>
                     )}
                     <td className="py-3.5 px-4">
