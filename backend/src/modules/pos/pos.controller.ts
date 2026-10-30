@@ -22,11 +22,11 @@ posRouter.post('/orders', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER', 'CASHI
       branchId: z.string().optional(),
       businessDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD').optional(),
       paymentMethod: z.enum(['CASH', 'CBE', 'TELEBIRR', 'MOBILE_BANKING', 'CREDIT']).default('CASH'),
-      customerName: z.string().optional(),
-      customerPhone: z.string().optional(),
+      customerName: z.string().max(100, 'Customer name too long').optional(),
+      customerPhone: z.string().max(25, 'Phone number too long').optional(),
       items: z.array(z.object({
         productId: z.string().min(1, 'Product ID is required'),
-        quantity: z.number().int().positive('Quantity must be greater than 0'),
+        quantity: z.number().int().positive('Quantity must be greater than 0').max(10000, 'Maximum 10,000 units per line item'),
         unitPrice: z.number().positive().optional(),
       })).min(1, 'Order must contain at least one item'),
     });
@@ -36,11 +36,14 @@ posRouter.post('/orders', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER', 'CASHI
       return res.status(400).json({ error: parsed.error.errors[0]?.message });
     }
 
-    // Determine active branch
-    let branchId = user.branchId;
-    if ((user.role === 'OWNER' || user.role === 'ADMIN') && parsed.data.branchId) {
-      branchId = parsed.data.branchId;
+    // Determine active branch with zero-trust boundary
+    if (parsed.data.branchId && user.role !== 'OWNER' && user.role !== 'ADMIN' && parsed.data.branchId !== user.branchId) {
+      return res.status(403).json({ error: 'Forbidden: You cannot create orders for another branch.' });
     }
+
+    let branchId = (user.role === 'OWNER' || user.role === 'ADMIN') && parsed.data.branchId
+      ? parsed.data.branchId
+      : user.branchId;
 
     if (!branchId) {
       return res.status(400).json({ error: 'No active branch assigned for this transaction.' });
@@ -57,8 +60,30 @@ posRouter.post('/orders', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER', 'CASHI
 
     const businessDate = parsed.data.businessDate || getTodayDateString();
 
-    // Verify all products
-    const productIds = parsed.data.items.map((i) => i.productId);
+    // Prevent sales on future dates
+    const today = getTodayDateString();
+    if (businessDate > today && user.role !== 'OWNER' && user.role !== 'ADMIN') {
+      return res.status(400).json({ error: 'Cannot record sales on future business dates.' });
+    }
+
+    // Deduplicate items by productId in cart
+    const itemAggregator = new Map<string, { productId: string; quantity: number; requestedUnitPrice?: number }>();
+    for (const rawItem of parsed.data.items) {
+      const existing = itemAggregator.get(rawItem.productId);
+      if (existing) {
+        existing.quantity += rawItem.quantity;
+      } else {
+        itemAggregator.set(rawItem.productId, {
+          productId: rawItem.productId,
+          quantity: rawItem.quantity,
+          requestedUnitPrice: rawItem.unitPrice,
+        });
+      }
+    }
+    const aggregatedItems = Array.from(itemAggregator.values());
+
+    // Verify all products exist and are active
+    const productIds = aggregatedItems.map((i) => i.productId);
     const products = await prisma.product.findMany({
       where: { id: { in: productIds } },
     });
@@ -69,7 +94,8 @@ posRouter.post('/orders', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER', 'CASHI
 
     const productMap = new Map(products.map((p) => [p.id, p]));
 
-    // Compute line items and total
+    // Compute line items with Devil's Advocate price tampering protection:
+    // Cashiers CANNOT arbitrarily discount unit prices in the body. Only Owner/Admin can override price.
     let totalAmount = 0;
     const itemsToCreate: Array<{
       productId: string;
@@ -78,10 +104,20 @@ posRouter.post('/orders', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER', 'CASHI
       subtotal: number;
     }> = [];
 
-    for (const item of parsed.data.items) {
+    const isAuthorizedForPriceOverride = user.role === 'OWNER' || user.role === 'ADMIN';
+
+    for (const item of aggregatedItems) {
       const product = productMap.get(item.productId)!;
-      const price = item.unitPrice !== undefined ? item.unitPrice : Number(product.sellingPrice);
-      const subtotal = price * item.quantity;
+      if (!product.isActive) {
+        return res.status(400).json({ error: `Product "${product.name}" is discontinued and cannot be sold.` });
+      }
+
+      let price = Number(product.sellingPrice);
+      if (isAuthorizedForPriceOverride && item.requestedUnitPrice !== undefined) {
+        price = item.requestedUnitPrice;
+      }
+
+      const subtotal = Math.round(price * item.quantity * 100) / 100;
       totalAmount += subtotal;
 
       itemsToCreate.push({
@@ -92,7 +128,14 @@ posRouter.post('/orders', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER', 'CASHI
       });
     }
 
-    // Generate receipt number e.g. REC-MEG-20261030-0001
+    totalAmount = Math.round(totalAmount * 100) / 100;
+
+    // Guard against Decimal(10, 2) overflow
+    if (totalAmount > 99999999.99) {
+      return res.status(400).json({ error: 'Order total exceeds maximum allowable transaction limit.' });
+    }
+
+    // Generate sequential receipt e.g. REC-MEG-20261030-0001
     const dateCompact = businessDate.replace(/-/g, '');
     const todaysSalesCount = await prisma.sale.count({
       where: {
@@ -104,56 +147,61 @@ posRouter.post('/orders', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER', 'CASHI
     const seq = String(todaysSalesCount + 1).padStart(4, '0');
     const receiptNumber = `REC-${branch.code}-${dateCompact}-${seq}`;
 
-    // Execute atomic sale & stock decrement
-    const sale = await prisma.$transaction(async (tx) => {
-      const createdSale = await tx.sale.create({
-        data: {
-          receiptNumber,
-          branchId,
-          cashierId: user.id,
-          businessDate,
-          paymentMethod: parsed.data.paymentMethod,
-          totalAmount,
-          customerName: parsed.data.customerName?.trim() || null,
-          customerPhone: parsed.data.customerPhone?.trim() || null,
-          items: {
-            create: itemsToCreate,
-          },
-        },
-        include: {
-          items: {
-            include: {
-              product: {
-                select: { id: true, name: true, sku: true, unit: true },
-              },
+    // Execute atomic sale & stock decrement with 30s timeout
+    const sale = await prisma.$transaction(
+      async (tx) => {
+        const createdSale = await tx.sale.create({
+          data: {
+            receiptNumber,
+            branchId,
+            cashierId: user.id,
+            businessDate,
+            paymentMethod: parsed.data.paymentMethod,
+            totalAmount,
+            customerName: parsed.data.customerName?.trim() || null,
+            customerPhone: parsed.data.customerPhone?.trim() || null,
+            items: {
+              create: itemsToCreate,
             },
           },
-          branch: {
-            select: { id: true, name: true, code: true, address: true },
-          },
-          cashier: {
-            select: { id: true, fullName: true, phone: true },
-          },
-        },
-      });
-
-      // Atomically decrement shelf stock
-      for (const item of itemsToCreate) {
-        await tx.branchProductStock.upsert({
-          where: { branchId_productId: { branchId, productId: item.productId } },
-          update: {
-            availableStock: { decrement: item.quantity },
-          },
-          create: {
-            branchId,
-            productId: item.productId,
-            availableStock: -item.quantity,
+          include: {
+            items: {
+              include: {
+                product: {
+                  select: { id: true, name: true, sku: true, unit: true },
+                },
+              },
+            },
+            branch: {
+              select: { id: true, name: true, code: true, address: true },
+            },
+            cashier: {
+              select: { id: true, fullName: true, phone: true },
+            },
           },
         });
-      }
 
-      return createdSale;
-    }, { timeout: 30000, maxWait: 10000 });
+        // Atomically decrement shelf stock for active branch (concurrent over WAN)
+        await Promise.all(
+          itemsToCreate.map((item) =>
+            tx.branchProductStock.upsert({
+              where: { branchId_productId: { branchId, productId: item.productId } },
+              update: {
+                availableStock: { decrement: item.quantity },
+              },
+              create: {
+                branchId,
+                productId: item.productId,
+                availableStock: -item.quantity,
+              },
+            })
+          )
+        );
+
+        return createdSale;
+      },
+      { timeout: 30000, maxWait: 10000 }
+    );
 
     res.status(201).json({
       ...sale,
@@ -207,7 +255,6 @@ posRouter.get('/orders/today', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER', '
       take: 100,
     });
 
-    // Compute summary stats
     let totalCash = 0;
     let totalTelebirr = 0;
     let totalCbe = 0;
@@ -235,10 +282,10 @@ posRouter.get('/orders/today', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER', '
       businessDate,
       summary: {
         totalOrders: sales.length,
-        totalGross,
-        totalCash,
-        totalTelebirr,
-        totalCbe,
+        totalGross: Math.round(totalGross * 100) / 100,
+        totalCash: Math.round(totalCash * 100) / 100,
+        totalTelebirr: Math.round(totalTelebirr * 100) / 100,
+        totalCbe: Math.round(totalCbe * 100) / 100,
       },
       orders: formattedSales,
     });
@@ -265,6 +312,11 @@ posRouter.get('/orders/:id', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER', 'CA
 
     if (!sale) {
       return res.status(404).json({ error: 'Receipt not found' });
+    }
+
+    // Zero-trust boundary: cashiers cannot inspect receipts from other branches
+    if (req.user!.role === 'CASHIER' && sale.branchId !== req.user!.branchId) {
+      return res.status(403).json({ error: 'Forbidden: You cannot inspect receipts from another branch.' });
     }
 
     res.json({

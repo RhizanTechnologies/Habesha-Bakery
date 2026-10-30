@@ -27,8 +27,8 @@ productsRouter.get('/categories', async (_req: AuthRequest, res: Response) => {
 productsRouter.post('/categories', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER'), async (req: AuthRequest, res: Response) => {
   try {
     const schema = z.object({
-      name: z.string().min(2, 'Category name must be at least 2 characters'),
-      description: z.string().optional(),
+      name: z.string().min(2, 'Category name must be at least 2 characters').max(60),
+      description: z.string().max(255).optional(),
     });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
@@ -161,10 +161,10 @@ productsRouter.get('/:id', async (req: AuthRequest, res: Response) => {
 productsRouter.post('/', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER'), async (req: AuthRequest, res: Response) => {
   try {
     const schema = z.object({
-      name: z.string().min(2, 'Name must be at least 2 characters'),
-      sku: z.string().min(2, 'SKU must be at least 2 characters'),
-      sellingPrice: z.number().positive('Selling price must be greater than 0'),
-      costPrice: z.number().positive().optional(),
+      name: z.string().min(2, 'Name must be at least 2 characters').max(100),
+      sku: z.string().min(2, 'SKU must be at least 2 characters').max(30),
+      sellingPrice: z.number().positive('Selling price must be greater than 0').max(100000),
+      costPrice: z.number().nonnegative().max(100000).optional(),
       categoryId: z.string().min(1, 'Category is required'),
       unit: z.string().default('PIECE'),
       isActive: z.boolean().default(true),
@@ -176,11 +176,12 @@ productsRouter.post('/', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER'), async 
       return res.status(400).json({ error: parsed.error.errors[0]?.message });
     }
 
+    const normalizedSku = parsed.data.sku.trim().toUpperCase();
     const existingSku = await prisma.product.findUnique({
-      where: { sku: parsed.data.sku.trim().toUpperCase() },
+      where: { sku: normalizedSku },
     });
     if (existingSku) {
-      return res.status(409).json({ error: 'A product with this SKU already exists' });
+      return res.status(409).json({ error: `A product with SKU "${normalizedSku}" already exists` });
     }
 
     // Verify category
@@ -195,7 +196,7 @@ productsRouter.post('/', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER'), async 
     const product = await prisma.product.create({
       data: {
         name: parsed.data.name.trim(),
-        sku: parsed.data.sku.trim().toUpperCase(),
+        sku: normalizedSku,
         sellingPrice: parsed.data.sellingPrice,
         costPrice: parsed.data.costPrice ?? null,
         categoryId: parsed.data.categoryId,
@@ -235,10 +236,10 @@ productsRouter.post('/', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER'), async 
 productsRouter.patch('/:id', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER'), async (req: AuthRequest, res: Response) => {
   try {
     const schema = z.object({
-      name: z.string().min(2).optional(),
-      sku: z.string().min(2).optional(),
-      sellingPrice: z.number().positive().optional(),
-      costPrice: z.number().positive().nullable().optional(),
+      name: z.string().min(2).max(100).optional(),
+      sku: z.string().min(2).max(30).optional(),
+      sellingPrice: z.number().positive().max(100000).optional(),
+      costPrice: z.number().nonnegative().max(100000).nullable().optional(),
       categoryId: z.string().optional(),
       unit: z.string().optional(),
       isActive: z.boolean().optional(),
@@ -251,7 +252,16 @@ productsRouter.patch('/:id', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER'), as
 
     const data: any = {};
     if (parsed.data.name !== undefined) data.name = parsed.data.name.trim();
-    if (parsed.data.sku !== undefined) data.sku = parsed.data.sku.trim().toUpperCase();
+    if (parsed.data.sku !== undefined) {
+      const normalizedSku = parsed.data.sku.trim().toUpperCase();
+      const existing = await prisma.product.findFirst({
+        where: { sku: normalizedSku, NOT: { id: req.params.id } },
+      });
+      if (existing) {
+        return res.status(409).json({ error: `SKU "${normalizedSku}" is already taken by another product` });
+      }
+      data.sku = normalizedSku;
+    }
     if (parsed.data.sellingPrice !== undefined) data.sellingPrice = parsed.data.sellingPrice;
     if (parsed.data.costPrice !== undefined) data.costPrice = parsed.data.costPrice;
     if (parsed.data.categoryId !== undefined) data.categoryId = parsed.data.categoryId;
@@ -274,12 +284,48 @@ productsRouter.patch('/:id', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER'), as
   }
 });
 
+// DELETE /api/products/:id - Soft-deactivates if sales history exists, hard-deletes if clean
+productsRouter.delete('/:id', requireRole('OWNER', 'ADMIN'), async (req: AuthRequest, res: Response) => {
+  try {
+    const product = await prisma.product.findUnique({
+      where: { id: req.params.id },
+      include: {
+        _count: { select: { saleItems: true } },
+      },
+    });
+
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    if (product._count.saleItems > 0) {
+      // Soft-deactivate to protect relational financial integrity
+      const updated = await prisma.product.update({
+        where: { id: req.params.id },
+        data: { isActive: false },
+      });
+      return res.json({
+        message: 'Product has active sales transaction history. Deactivated successfully instead of hard deletion.',
+        product: updated,
+      });
+    }
+
+    // Clean product: hard-delete
+    await prisma.branchProductStock.deleteMany({ where: { productId: req.params.id } });
+    await prisma.product.delete({ where: { id: req.params.id } });
+
+    res.json({ message: 'Product deleted permanently.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to delete product' });
+  }
+});
+
 // PATCH /api/products/:id/stock - Adjust shelf stock for a branch
 productsRouter.patch('/:id/stock', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER', 'STOREKEEPER'), async (req: AuthRequest, res: Response) => {
   try {
     const schema = z.object({
       branchId: z.string().optional(),
-      availableStock: z.number().int().nonnegative(),
+      availableStock: z.number().int().nonnegative('Stock cannot be negative'),
     });
 
     const parsed = schema.safeParse(req.body);

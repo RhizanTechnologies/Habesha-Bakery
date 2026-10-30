@@ -3,6 +3,17 @@ import { Pool, neonConfig } from '@neondatabase/serverless';
 import { PrismaNeon } from '@prisma/adapter-neon';
 import ws from 'ws';
 
+// Force WebSocket to use IPv4 to prevent hanging on broken IPv6 routes
+class IPv4WebSocket extends ws {
+  constructor(address: any, protocols?: any, options?: any) {
+    if (typeof protocols === 'object' && protocols !== null && !Array.isArray(protocols)) {
+      options = protocols;
+      protocols = undefined;
+    }
+    super(address, protocols, { ...options, family: 4 });
+  }
+}
+
 function getDatabaseUrl(): string | undefined {
   let url = (process.env.DATABASE_URL_UNPOOLED || process.env.DIRECT_URL || process.env.DATABASE_URL)?.trim();
   if (!url) return undefined;
@@ -18,8 +29,10 @@ const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefi
 
 function createPrismaClient(): PrismaClient {
   if (dbUrl && (dbUrl.includes('neon.tech') || dbUrl.includes('postgres'))) {
-    neonConfig.webSocketConstructor = ws;
-    const pool = new Pool({ connectionString: dbUrl });
+    neonConfig.webSocketConstructor = IPv4WebSocket;
+    const pool = new Pool({
+      connectionString: dbUrl,
+    });
     const adapter = new PrismaNeon(pool);
     return new PrismaClient({
       adapter,

@@ -56,14 +56,19 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
   }
 
   const token = authHeader.split(' ')[1];
+  let decoded: any;
   try {
-    const decoded = jwt.verify(token, getJwtSecret()) as any;
-    const targetUserId = decoded.id || decoded.userId;
+    decoded = jwt.verify(token, getJwtSecret()) as any;
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid or expired session token.' });
+  }
 
-    if (!targetUserId) {
-      return res.status(401).json({ error: 'Invalid token payload.' });
-    }
+  const targetUserId = decoded.id || decoded.userId;
+  if (!targetUserId) {
+    return res.status(401).json({ error: 'Invalid token payload.' });
+  }
 
+  try {
     // Verify user is still active in database and assigned branch is active
     const user = await prisma.user.findUnique({
       where: { id: targetUserId },
@@ -94,8 +99,9 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
       branchId: user.branchId,
     };
     next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid or expired session token.' });
+  } catch (dbErr: any) {
+    console.error('Database connection error in authMiddleware:', dbErr?.message || dbErr);
+    return res.status(503).json({ error: 'Authentication service temporarily unavailable due to database connectivity issue.' });
   }
 }
 

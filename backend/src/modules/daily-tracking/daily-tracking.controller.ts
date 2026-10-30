@@ -20,10 +20,22 @@ dailyTrackingRouter.get('/summary', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGE
     const user = req.user!;
     const businessDate = (req.query.businessDate as string) || getTodayDateString();
 
-    let branchId = user.branchId;
-    if ((user.role === 'OWNER' || user.role === 'ADMIN') && req.query.branchId) {
-      branchId = req.query.branchId as string;
+    // Prevent non-admin users from probing future closeouts
+    const today = getTodayDateString();
+    if (businessDate > today && user.role !== 'OWNER' && user.role !== 'ADMIN') {
+      return res.status(400).json({ error: 'Cannot query closeout summary for future business dates.' });
     }
+
+    const requestedBranchId = req.query.branchId as string | undefined;
+
+    // Zero-trust check: cashiers and non-admins CANNOT query another branch
+    if (requestedBranchId && user.role !== 'OWNER' && user.role !== 'ADMIN' && requestedBranchId !== user.branchId) {
+      return res.status(403).json({ error: 'Forbidden: You cannot view closeout summary for another branch.' });
+    }
+
+    const branchId = (user.role === 'OWNER' || user.role === 'ADMIN') && requestedBranchId
+      ? requestedBranchId
+      : user.branchId;
 
     if (!branchId) {
       return res.status(400).json({ error: 'Branch context is required for daily tracking summary' });
@@ -63,8 +75,8 @@ dailyTrackingRouter.get('/summary', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGE
       else if (s.paymentMethod === 'CREDIT') totalCreditSales += amt;
     }
 
-    const totalDigitalSales = totalTelebirrSales + totalCbeSales;
-    const totalGrossSales = totalCashSales + totalDigitalSales + totalCreditSales;
+    const totalDigitalSales = Math.round((totalTelebirrSales + totalCbeSales) * 100) / 100;
+    const totalGrossSales = Math.round((totalCashSales + totalDigitalSales + totalCreditSales) * 100) / 100;
 
     // Check existing closeout
     const existingCloseout = await prisma.dailyCashTracking.findUnique({
@@ -83,11 +95,11 @@ dailyTrackingRouter.get('/summary', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGE
       branch,
       businessDate,
       totalOrders: sales.length,
-      totalCashSales,
-      totalTelebirrSales,
-      totalCbeSales,
+      totalCashSales: Math.round(totalCashSales * 100) / 100,
+      totalTelebirrSales: Math.round(totalTelebirrSales * 100) / 100,
+      totalCbeSales: Math.round(totalCbeSales * 100) / 100,
       totalDigitalSales,
-      totalCreditSales,
+      totalCreditSales: Math.round(totalCreditSales * 100) / 100,
       totalGrossSales,
       closeout: existingCloseout
         ? {
@@ -114,10 +126,10 @@ dailyTrackingRouter.post('/closeout', requireRole('OWNER', 'ADMIN', 'BRANCH_MANA
     const schema = z.object({
       branchId: z.string().optional(),
       businessDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD').optional(),
-      startingFloat: z.number().nonnegative('Starting float must be 0 or greater').default(0),
-      actualCountedCash: z.number().nonnegative('Counted cash must be 0 or greater'),
-      totalExpenses: z.number().nonnegative('Expenses must be 0 or greater').default(0),
-      notes: z.string().optional(),
+      startingFloat: z.number().nonnegative('Starting float must be 0 or greater').max(1000000).default(0),
+      actualCountedCash: z.number().nonnegative('Counted cash must be 0 or greater').max(10000000),
+      totalExpenses: z.number().nonnegative('Expenses must be 0 or greater').max(1000000).default(0),
+      notes: z.string().max(500, 'Notes cannot exceed 500 characters').optional(),
     });
 
     const parsed = schema.safeParse(req.body);
@@ -125,16 +137,26 @@ dailyTrackingRouter.post('/closeout', requireRole('OWNER', 'ADMIN', 'BRANCH_MANA
       return res.status(400).json({ error: parsed.error.errors[0]?.message });
     }
 
-    let branchId = user.branchId;
-    if ((user.role === 'OWNER' || user.role === 'ADMIN') && parsed.data.branchId) {
-      branchId = parsed.data.branchId;
+    // Zero-trust check: cashiers and non-admins CANNOT close out another branch
+    if (parsed.data.branchId && user.role !== 'OWNER' && user.role !== 'ADMIN' && parsed.data.branchId !== user.branchId) {
+      return res.status(403).json({ error: 'Forbidden: You cannot submit closeout for another branch.' });
     }
+
+    const branchId = (user.role === 'OWNER' || user.role === 'ADMIN') && parsed.data.branchId
+      ? parsed.data.branchId
+      : user.branchId;
 
     if (!branchId) {
       return res.status(400).json({ error: 'No branch context available' });
     }
 
     const businessDate = parsed.data.businessDate || getTodayDateString();
+
+    // Prevent non-admin users from submitting future closeouts
+    const today = getTodayDateString();
+    if (businessDate > today && user.role !== 'OWNER' && user.role !== 'ADMIN') {
+      return res.status(400).json({ error: 'Cannot submit closeout for future business dates.' });
+    }
 
     // Calculate actual total cash sales from recorded orders
     const sales = await prisma.sale.findMany({
@@ -159,11 +181,14 @@ dailyTrackingRouter.post('/closeout', requireRole('OWNER', 'ADMIN', 'BRANCH_MANA
       }
     }
 
+    totalCashSales = Math.round(totalCashSales * 100) / 100;
+    totalDigitalSales = Math.round(totalDigitalSales * 100) / 100;
+
     // Mathematical formula from legacy specification:
     // expectedCash = startingFloat + totalCashSales - totalExpenses
     // variance = actualCountedCash - expectedCash
-    const expectedCash = parsed.data.startingFloat + totalCashSales - parsed.data.totalExpenses;
-    const variance = parsed.data.actualCountedCash - expectedCash;
+    const expectedCash = Math.round((parsed.data.startingFloat + totalCashSales - parsed.data.totalExpenses) * 100) / 100;
+    const variance = Math.round((parsed.data.actualCountedCash - expectedCash) * 100) / 100;
 
     const closeout = await prisma.dailyCashTracking.upsert({
       where: {
@@ -221,10 +246,16 @@ dailyTrackingRouter.post('/closeout', requireRole('OWNER', 'ADMIN', 'BRANCH_MANA
 dailyTrackingRouter.get('/history', requireRole('OWNER', 'ADMIN', 'BRANCH_MANAGER', 'CASHIER'), async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
-    let branchId = user.branchId;
-    if ((user.role === 'OWNER' || user.role === 'ADMIN') && req.query.branchId) {
-      branchId = req.query.branchId as string;
+    const requestedBranchId = req.query.branchId as string | undefined;
+
+    // Zero-trust check: non-admin CANNOT view another branch's closeout history
+    if (requestedBranchId && user.role !== 'OWNER' && user.role !== 'ADMIN' && requestedBranchId !== user.branchId) {
+      return res.status(403).json({ error: 'Forbidden: You cannot view closeout history for another branch.' });
     }
+
+    let branchId = (user.role === 'OWNER' || user.role === 'ADMIN') && requestedBranchId
+      ? requestedBranchId
+      : user.branchId;
 
     const where: any = {};
     if (branchId) {
