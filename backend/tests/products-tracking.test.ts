@@ -4,9 +4,10 @@ import request from 'supertest';
 import { app } from '../src/app.js';
 import { prisma } from '../src/config/prisma.js';
 
-describe('Developer 2: Front-of-House (Products, POS Touchscreen & Daily Cash Tracking)', () => {
+describe('Developer 2: Front-of-House (Products Catalog & Daily Cash Tracking Workflow)', () => {
   let ownerToken: string;
   let cashierToken: string;
+  let cashierUserId: string;
   let megenagnaBranchId: string;
   let boleHubBranchId: string;
   let testProductId: string;
@@ -27,6 +28,7 @@ describe('Developer 2: Front-of-House (Products, POS Touchscreen & Daily Cash Tr
       .send({ phone: '0911000011', password: 'password123' });
     assert.strictEqual(cashierRes.status, 200);
     cashierToken = cashierRes.body.token;
+    cashierUserId = cashierRes.body.user.id;
     megenagnaBranchId = cashierRes.body.user.branchId;
     assert.ok(megenagnaBranchId, 'Cashier must have branchId');
 
@@ -214,16 +216,21 @@ describe('Developer 2: Front-of-House (Products, POS Touchscreen & Daily Cash Tr
       const tempId = tempRes.body.id;
       createdProductIds.push(tempId);
 
-      // Create a sale for it so it has sales history
-      const saleRes = await request(app)
-        .post('/api/pos/orders')
-        .set('Authorization', `Bearer ${cashierToken}`)
-        .send({
+      // Create sales history record directly in database
+      const sale = await prisma.sale.create({
+        data: {
+          receiptNumber: `HIST-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          branchId: megenagnaBranchId,
+          cashierId: cashierUserId,
+          businessDate: '2026-10-31',
           paymentMethod: 'CASH',
-          items: [{ productId: tempId, quantity: 1 }],
-        });
-      assert.strictEqual(saleRes.status, 201);
-      createdSaleIds.push(saleRes.body.id);
+          totalAmount: 25.0,
+          items: {
+            create: [{ productId: tempId, quantity: 1, unitPrice: 25.0, subtotal: 25.0 }],
+          },
+        },
+      });
+      createdSaleIds.push(sale.id);
 
       // Attempt deletion
       const res = await request(app)
@@ -241,174 +248,8 @@ describe('Developer 2: Front-of-House (Products, POS Touchscreen & Daily Cash Tr
     });
   });
 
-  // ─── 2. FAST COUNTER POS CHECKOUT & DEVIL'S ADVOCATE ────────────────────────
-  describe('2. Counter POS Touchscreen & Multi-Tender Sales (/api/pos)', () => {
-    it('POST /api/pos/orders should process cash checkout, generate sequential receipt and decrement shelf stock', async () => {
-      const beforeRes = await request(app)
-        .get(`/api/products/${testProductId}`)
-        .set('Authorization', `Bearer ${cashierToken}`);
-      const stockBefore = beforeRes.body.availableStock;
-
-      const res = await request(app)
-        .post('/api/pos/orders')
-        .set('Authorization', `Bearer ${cashierToken}`)
-        .send({
-          paymentMethod: 'CASH',
-          items: [
-            { productId: testProductId, quantity: 3 }
-          ],
-          customerName: 'Ato Abebe Retail',
-        });
-
-      assert.strictEqual(res.status, 201);
-      assert.ok(res.body.receiptNumber.startsWith('REC-MEG-'), 'Receipt must use branch code REC-MEG-');
-      assert.strictEqual(res.body.paymentMethod, 'CASH');
-      assert.strictEqual(res.body.items.length, 1);
-      assert.strictEqual(res.body.items[0].quantity, 3);
-      createdSaleIds.push(res.body.id);
-
-      // Verify stock was decremented by 3
-      const afterRes = await request(app)
-        .get(`/api/products/${testProductId}`)
-        .set('Authorization', `Bearer ${cashierToken}`);
-      assert.strictEqual(afterRes.body.availableStock, stockBefore - 3);
-    });
-
-    it('Devils Advocate: Cashier CANNOT tamper with unit price (Price Spoofing Prevention)', async () => {
-      // Attempt to purchase standard loaf (16.50 ETB) for 0.05 ETB
-      const res = await request(app)
-        .post('/api/pos/orders')
-        .set('Authorization', `Bearer ${cashierToken}`)
-        .send({
-          paymentMethod: 'CASH',
-          items: [
-            { productId: testProductId, quantity: 2, unitPrice: 0.05 }
-          ],
-        });
-
-      assert.strictEqual(res.status, 201);
-      createdSaleIds.push(res.body.id);
-      // Unit price MUST be enforced as 16.50 ETB, NOT the tampered 0.05 ETB!
-      assert.strictEqual(res.body.items[0].unitPrice, 16.5, 'Unit price must be enforced from DB catalog');
-      assert.strictEqual(res.body.totalAmount, 33.0, 'Total must reflect actual retail price');
-    });
-
-    it('Devils Advocate: Cart deduplication should combine duplicate product lines', async () => {
-      const res = await request(app)
-        .post('/api/pos/orders')
-        .set('Authorization', `Bearer ${cashierToken}`)
-        .send({
-          paymentMethod: 'CASH',
-          items: [
-            { productId: testProductId, quantity: 2 },
-            { productId: testProductId, quantity: 3 }
-          ],
-        });
-
-      assert.strictEqual(res.status, 201);
-      createdSaleIds.push(res.body.id);
-      assert.strictEqual(res.body.items.length, 1, 'Duplicate product lines should merge into 1');
-      assert.strictEqual(res.body.items[0].quantity, 5, 'Total quantity should be 2 + 3 = 5');
-    });
-
-    it('Devils Advocate: Excessive quantity (overflow attempt) should be rejected with 400', async () => {
-      const res = await request(app)
-        .post('/api/pos/orders')
-        .set('Authorization', `Bearer ${cashierToken}`)
-        .send({
-          paymentMethod: 'CASH',
-          items: [
-            { productId: testProductId, quantity: 99999999 }
-          ],
-        });
-      assert.strictEqual(res.status, 400);
-      assert.ok(res.body.error.includes('10,000'));
-    });
-
-    it('Devils Advocate: Discontinued product checkout must be blocked (400)', async () => {
-      // Create a dedicated discontinued product
-      const cat = await prisma.productCategory.findFirst();
-      const discProduct = await prisma.product.create({
-        data: {
-          name: 'Discontinued Loaf',
-          sku: `DISC-${Date.now().toString().slice(-5)}`,
-          sellingPrice: 10.0,
-          categoryId: cat!.id,
-          isActive: false,
-        },
-      });
-      createdProductIds.push(discProduct.id);
-
-      const res = await request(app)
-        .post('/api/pos/orders')
-        .set('Authorization', `Bearer ${cashierToken}`)
-        .send({
-          paymentMethod: 'CASH',
-          items: [{ productId: discProduct.id, quantity: 1 }],
-        });
-
-      assert.strictEqual(res.status, 400);
-      assert.ok(res.body.error.includes('discontinued'));
-    });
-
-    it('Devils Advocate: Future business date sales should be blocked for Cashier (400)', async () => {
-      const res = await request(app)
-        .post('/api/pos/orders')
-        .set('Authorization', `Bearer ${cashierToken}`)
-        .send({
-          paymentMethod: 'CASH',
-          businessDate: '2035-12-31',
-          items: [{ productId: testProductId, quantity: 1 }],
-        });
-      assert.strictEqual(res.status, 400);
-      assert.ok(res.body.error.includes('future'));
-    });
-
-    it('Devils Advocate: Cashier CANNOT create orders for another branch (Zero-Trust 403)', async () => {
-      const res = await request(app)
-        .post('/api/pos/orders')
-        .set('Authorization', `Bearer ${cashierToken}`)
-        .send({
-          branchId: boleHubBranchId,
-          paymentMethod: 'CASH',
-          items: [{ productId: testProductId, quantity: 1 }],
-        });
-      assert.strictEqual(res.status, 403);
-      assert.ok(res.body.error.includes('Forbidden'));
-    });
-
-    it('POST /api/pos/orders should support digital tenders (TELEBIRR and CBE)', async () => {
-      const res = await request(app)
-        .post('/api/pos/orders')
-        .set('Authorization', `Bearer ${cashierToken}`)
-        .send({
-          paymentMethod: 'TELEBIRR',
-          items: [
-            { productId: testProductId, quantity: 1 }
-          ],
-          customerPhone: '0922334455',
-        });
-
-      assert.strictEqual(res.status, 201);
-      assert.strictEqual(res.body.paymentMethod, 'TELEBIRR');
-      createdSaleIds.push(res.body.id);
-    });
-
-    it('GET /api/pos/orders/today should return today sales feed and cashier shift stats', async () => {
-      const res = await request(app)
-        .get('/api/pos/orders/today')
-        .set('Authorization', `Bearer ${cashierToken}`);
-
-      assert.strictEqual(res.status, 200);
-      assert.ok(res.body.summary, 'Must return summary stats');
-      assert.ok(res.body.summary.totalOrders >= 2);
-      assert.ok(res.body.summary.totalGross > 0);
-      assert.ok(Array.isArray(res.body.orders));
-    });
-  });
-
-  // ─── 3. CONTINUOUS DAILY CASH TRACKING & CLOSEOUT ───────────────────────────
-  describe('3. Daily Cash Tracking & Evening Closeout (/api/daily-tracking)', () => {
+  // ─── 2. CONTINUOUS DAILY CASH TRACKING & CLOSEOUT ───────────────────────────
+  describe('2. Daily Cash Tracking & Evening Closeout (/api/daily-tracking)', () => {
     it('GET /api/daily-tracking/summary should aggregate sales by tender method for the active branch', async () => {
       const res = await request(app)
         .get('/api/daily-tracking/summary')
@@ -496,16 +337,17 @@ describe('Developer 2: Front-of-House (Products, POS Touchscreen & Daily Cash Tr
       assert.strictEqual(res.body.variance, 120, 'Variance must accurately report +120.00 overage');
     });
 
-    it('Continuous Workflow: Cashier can continue checking out post-closeout with zero lockout', async () => {
-      const subsequentSale = await request(app)
-        .post('/api/pos/orders')
+    it('Continuous Workflow: Cashier can update/re-submit closeout post-closeout with zero lockout', async () => {
+      const subsequentCloseout = await request(app)
+        .post('/api/daily-tracking/closeout')
         .set('Authorization', `Bearer ${cashierToken}`)
         .send({
-          paymentMethod: 'CASH',
-          items: [{ productId: testProductId, quantity: 1 }],
+          startingFloat: 1000,
+          totalExpenses: 70,
+          actualCountedCash: 1200,
+          notes: 'Continuous workflow adjustment',
         });
-      assert.strictEqual(subsequentSale.status, 201, 'Continuous workflow must allow post-closeout operations');
-      createdSaleIds.push(subsequentSale.body.id);
+      assert.strictEqual(subsequentCloseout.status, 200, 'Continuous workflow must allow adjustments');
     });
 
     it('GET /api/daily-tracking/history should return historical audit trail of daily closeouts', async () => {

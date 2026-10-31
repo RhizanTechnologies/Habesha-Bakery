@@ -19,6 +19,7 @@ import {
   ShieldCheck,
   CheckCircle2,
   CalendarDays,
+  ShoppingCart,
 } from 'lucide-react';
 
 function money(value: number | undefined | null) {
@@ -111,22 +112,22 @@ export default function DashboardPage() {
         </div>
         <div className="bg-[#FFFDF8] border border-[#EDE4D5] rounded-2xl px-4 py-2 flex items-center space-x-3 shadow-2xs self-start sm:self-auto">
           <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-bold text-[#4A2E1B]">Live Session Active</span>
+          <span className="text-xs font-bold text-[#4A2E1B]">Daily Workflow Active</span>
         </div>
       </div>
 
       {/* ── Quick Action Shortcuts ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Link
-          href="/pos"
+          href="/products"
           className="p-3.5 rounded-2xl bg-white border border-[#EDE4D5] hover:border-[#E87A18] hover:shadow-md transition group flex items-center gap-3"
         >
           <div className="w-10 h-10 rounded-xl bg-amber-50 text-[#E87A18] flex items-center justify-center shrink-0 group-hover:scale-105 transition">
-            <Store className="w-5 h-5" />
+            <ShoppingCart className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <div className="text-xs font-black text-[#2C1B10] group-hover:text-[#E87A18] truncate">Counter POS</div>
-            <div className="text-[10px] text-[#8C7361] font-medium truncate">Touchscreen Register</div>
+            <div className="text-xs font-black text-[#2C1B10] group-hover:text-[#E87A18] truncate">Product Catalog</div>
+            <div className="text-[10px] text-[#8C7361] font-medium truncate">Prices &amp; Bread Catalog</div>
           </div>
         </Link>
         <Link

@@ -101,7 +101,6 @@ export function Sidebar({ onCloseMobileMenu }: SidebarProps) {
 
   const salesMoneyItems = [
     { label: 'Product Catalog', href: '/products', icon: <ShoppingCart className="w-4 h-4" />, badge: 'Plugin' },
-    { label: 'Counter POS', href: '/pos', icon: <Receipt className="w-4 h-4" />, badge: 'Plugin' },
     { label: 'Evening Closeout', href: '/daily-tracking/closeout', icon: <CircleDollarSign className="w-4 h-4" />, badge: 'Plugin' },
   ];
 
@@ -113,7 +112,7 @@ export function Sidebar({ onCloseMobileMenu }: SidebarProps) {
 
         {/* Plugin Preview Sections */}
         {navSection('Baking & Supply (Plugins)', bakingSupplyItems)}
-        {navSection('Sales & POS (Plugins)', salesMoneyItems)}
+        {navSection('Sales & Daily Tracking', salesMoneyItems)}
       </div>
 
       {/* Footer Info Box */}

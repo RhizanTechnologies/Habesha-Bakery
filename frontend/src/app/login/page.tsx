@@ -40,7 +40,7 @@ export default function LoginPage() {
     if (res.success && res.user) {
       const role = res.user.role;
       if (role === 'CASHIER') {
-        router.push('/pos');
+        router.push('/daily-tracking/closeout');
       } else if (role === 'STOREKEEPER' || role === 'STOCK_KEEPER') {
         router.push('/stock');
       } else if (
